@@ -15,8 +15,25 @@
     return null;
   }
   function missing(what) { A.h(crumbs([[what]]) + "<h1>Not in the lorebook</h1><p class='lede'>Nothing by that name is known here.</p>"); }
+  /* one hue per district, spaced round the wheel: the accent on its cards, its map pins and its hub page */
+  var DCOL = null;
+  function dcol(d) {
+    if (!DCOL) {
+      DCOL = {};
+      Object.keys(districtsAll()).sort().forEach(function (n, i, all) { DCOL[n] = "hsl(" + Math.round(i * 360 / all.length) + ", 62%, 62%)"; });
+    }
+    return DCOL[d] || "";
+  }
+  A.dcol = dcol;
+  function districtOf(kind, r) {
+    if (kind === "places") return r.district;
+    if (kind === "people") { var l = r.location && A.byName("locations", r.location); return l ? l.district : ""; }
+    return "";
+  }
+  function accent(d) { return d && dcol(d) ? ' style="--dc:' + dcol(d) + '"' : ""; }
   function card(kind, r, sub, land) {
-    return '<a class="card" href="' + A.href(kind, r.id) + '">' + (r.img !== undefined ? '<div class="pic' + (land ? " land" : "") + '">' +
+    var d = districtOf(kind, r);
+    return '<a class="card' + (d ? " dc" : "") + '" href="' + A.href(kind, r.id) + '"' + accent(d) + (d ? ' title="' + esc(d) + '"' : "") + ">" + (r.img !== undefined ? '<div class="pic' + (land ? " land" : "") + '">' +
       A.img(r.img, r.name) + "</div>" : "") + '<div class="body"><div class="t">' + esc(r.name) + "</div>" +
       (sub ? '<div class="s">' + sub + "</div>" : "") + (land || r.img === undefined ? '<div class="x">' + esc(A.first(r.info)) + "</div>" : "") +
       "</div></a>";
@@ -48,6 +65,11 @@
     col.appendChild(sec);
   }
   function nameCell(kind) { return function (r) { return '<a href="' + A.href(kind, r.id) + '">' + esc(r.name) + "</a>"; }; }
+  function byArea(people) {   // a place's people under the area they keep to, the areas in the place's own order
+    var groups = {}, order = [];
+    people.forEach(function (n) { var k = n.area || ""; if (!groups[k]) { groups[k] = []; order.push(k); } groups[k].push(n); });
+    return order.sort(function (a, b) { return (a === "") - (b === ""); }).map(function (k) { return {area: k, rows: groups[k]}; });
+  }
   function levels(lv) { return lv && lv.length ? lv.join("-") : ""; }
   function regionOf(name) { return A.byName("regions", name); }
   function placeLink(name, area) {
@@ -67,12 +89,36 @@
                  ["creatures", d.creatures.length, "creatures"], ["items", d.items.length, "items"], ["abilities", d.abilities.length, "abilities"],
                  ["traits", d.traits.length, "traits"], ["lore", d.lore.length, "lore entries"], ["mechanics", d.books.length, "guide books"],
                  ["say", d.say.length, "typed actions"], ["starts", d.starts.length, "story starts"], ["music", d.music.length, "tracks"]];
-    var pick = d.npcs.filter(function (n) { return n.img; });
-    var feat = pick.length ? pick[Math.floor(Math.random() * pick.length)] : null;
-    A.h("<h1>The Asagiri Isles</h1>" + (isles ? '<div class="prose">' + A.prose(isles.info.replace(/^\[[^\]]*\]\s*/, "")) + "</div>" : "") +
-      '<div class="tiles">' + tiles.map(function (t) { return '<a class="tile" href="' + t[0] + '/"><b>' + t[1] + "</b><span>" + t[2] + "</span></a>"; }).join("") +
-      "</div>" + (isles && isles.map ? '<h2>The map</h2><a class="hero" href="map/' + isles.id + '/">' + A.img(isles.map, "The Asagiri Isles map") + "</a>" : "") +
-      (feat ? "<h2>Someone you might meet</h2><div class='grid'>" + card("people", feat, esc(feat.type)) + "</div>" : "") +
+    var some = function (list, n) {   // n at random, no repeats
+      list = list.slice(); var out = [];
+      while (list.length && out.length < n) out.push(list.splice(Math.floor(Math.random() * list.length), 1)[0]);
+      return out;
+    };
+    var people = some(uniq(d.npcs.filter(function (n) { return n.img; })), 6);
+    var scenic = d.locations.filter(function (l) { return l.img && l.region === "The Asagiri Isles" && l.kind === "complex"; });
+    var hero = some(scenic, 1)[0], places = some(scenic.filter(function (l) { return l !== hero; }), 4);
+    var all = districtsAll(), dnames = Object.keys(all).sort();
+    var sl = function (n) { return n.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""); };
+    var tools = [["say/", "What to say", "The exact words that set off travel, bounties, crafting, your home and ship."],
+                 ["bench/", "Crafting bench", "Pick a recipe and get the lines to type, checked against the world's own scripts."],
+                 ["planner/", "Character planner", "Every creator pick with its unlocks; compare two builds side by side."],
+                 ["map/" + (isles ? isles.id + "/" : ""), "The map", "Twelve districts on one map: find a place, show one district."]];
+    var intro = isles ? A.first(isles.info.replace(/^\[[^\]]*\]\s*/, ""), 260) : "";
+    A.h('<section class="banner"' + (hero ? "" : ' data-plain="1"') + ">" + (hero ? A.img(hero.img, "").replace('loading="lazy" ', "") : "") +
+      '<div class="bannertext"><h1>The Asagiri Isles</h1><p>' + esc(intro) + '</p><div class="bannerlinks">' +
+      tools.map(function (t) { return '<a href="' + t[0] + '">' + esc(t[1]) + "</a>"; }).join("") + "</div>" +
+      (hero ? '<a class="pictured" href="' + A.href("places", hero.id) + '">Pictured: ' + esc(hero.name) + (hero.district ? ", " + esc(hero.district) : "") + "</a>" : "") +
+      "</div></section>" +
+      '<div class="tiles">' + tiles.map(function (t) { return '<a class="tile" href="' + t[0] + '/"><b>' + t[1] + "</b><span>" + t[2] + "</span></a>"; }).join("") + "</div>" +
+      "<h2>Start here</h2><div class='grid wide'>" + tools.map(function (t) {
+        return '<a class="card tool" href="' + t[0] + '"><div class="body"><div class="t">' + esc(t[1]) + '</div><div class="x">' + esc(t[2]) + "</div></div></a>";
+      }).join("") + "</div>" +
+      "<h2>The districts</h2><div class='dchips'>" + dnames.map(function (n) {
+        return '<a href="districts/' + sl(n) + '/"' + accent(n) + "><i></i>" + esc(n) + "</a>";
+      }).join("") + "</div>" +
+      (places.length ? "<h2>Places to visit</h2><div class='grid wide'>" + places.map(function (l) { return card("places", l, esc(l.district || ""), true); }).join("") + "</div>" : "") +
+      (people.length ? "<h2>People you might meet</h2><div class='grid'>" + people.map(function (n) { return card("people", n, esc(n.type)); }).join("") + "</div>" : "") +
+      (isles && isles.map ? '<h2>The map</h2><a class="hero" href="map/' + isles.id + '/">' + A.img(isles.map, "The Asagiri Isles map") + "</a>" : "") +
       '<p class="note" style="margin-top:32px">Everything here is what a player can learn at the table: no one\'s secrets, no hidden places. ' +
       "Built from the world file; data " + esc(d.sha || "") + ".</p>");
   };
@@ -99,11 +145,11 @@
     A.h(crumbs([["People", "people/"], [n.name]]) + "<h1>" + esc(n.name) + "</h1>" + (n.epithet ? '<p class="lede">' + esc(n.epithet) + "</p>" : "") +
       (versions.length > 1 ? '<nav class="tabs" aria-label="Eras">' + versions.map(function (o) {
         return '<a href="' + A.href("people", o.id) + '"' + (o.id === n.id ? ' class="on" aria-current="page"' : "") + ">" + esc(vlabel(o)) + "</a>";
-      }).join("") + "</nav>" : "") + '<div class="article"><div class="prose">' +
+      }).join("") + "</nav>" : "") + A.depth.compareHtml(versions, era) + '<div class="article"><div class="prose">' +
       A.prose(parts.join("\n\n"), n.name) +
       (n.personality.length ? "<h2>Personality</h2><ul>" + n.personality.map(function (l) {
         var m = l.split(/:\s*/); return "<li><strong>" + esc(m[0]) + ":</strong> " + esc(m.slice(1).join(": ")) + "</li>";
-      }).join("") + "</ul>" : "") +
+      }).join("") + "</ul>" : "") + A.depth.connectionsHtml(n) +
       (others.length ? "<h2>Also at " + esc(n.location) + "</h2><div class='grid'>" + others.slice(0, 18).map(function (o) {
         return card("people", o, esc(o.type));
       }).join("") + "</div>" : "") + "</div>" +
@@ -147,7 +193,9 @@
       (p.areas.length ? "<h2>Areas</h2><div class='gallery'>" + p.areas.map(function (a) {
         return "<figure>" + (a.img ? A.img(a.img, a.name) : '<div class="noimg" role="img" aria-label="No picture yet"></div>') + "<figcaption><b>" + esc(a.name) + "</b>" + A.link(esc(a.text.split("\n")[0]), p.name) + "</figcaption></figure>";
       }).join("") + "</div>" : "") +
-      (people.length ? "<h2>People here</h2><div class='grid'>" + people.map(function (n) { return card("people", n, esc(n.type)); }).join("") + "</div>" : "") +
+      (people.length ? "<h2>People here</h2>" + byArea(people).map(function (g) {
+        return (g.area ? "<h3>" + esc(g.area) + "</h3>" : "") + "<div class='grid'>" + g.rows.map(function (n) { return card("people", n, esc(n.type)); }).join("") + "</div>";
+      }).join("") : "") +
       "</div>" + A.infobox(p.name, p.img, [["District", p.district ? districtLink(p.district) : ""], ["Region", esc(p.region)], ["Era", era(p.region)],
         ["Kind", esc(p.kind)], ["Levels", levels(p.levels)], ["Factions", p.factions.map(function (f) { return A.nameLink("factions", f); }).join(" · ")],
         ["Map", reg && reg.map ? '<a href="map/' + reg.id + "/?pin=" + p.id + '">Show on map</a>' : ""]]) + "</div>");
@@ -173,11 +221,14 @@
       '</select><input id="mfind" type="search" placeholder="Find a place on this map" aria-label="Find a place" list="mlist"><datalist id="mlist">' +
       places.map(function (p) { return '<option value="' + esc(p.name) + '">'; }).join("") +
       '</datalist><label><input type="checkbox" id="mlbl"> Show labels</label><span class="count">' + places.length + " places</span></div>" +
+      (Object.keys(dists).length ? '<div class="dchips small" id="mlegend">' + Object.keys(dists).sort().map(function (d) {
+        return '<button type="button" data-d="' + esc(d) + '"' + accent(d) + "><i></i>" + esc(d) + "</button>";
+      }).join("") + "</div>" : "") +
       '<div class="map" id="map" tabindex="0" aria-label="Map of ' + esc(reg.name) + ': drag or arrow keys to pan, + and - to zoom; find a place with the box above">' +
       '<div class="stage" id="stage">' + A.img(reg.map, reg.name).replace('loading="lazy" ', "") +
       places.map(function (p) {
-        return '<button class="pin ' + esc(p.kind) + '" tabindex="-1" data-id="' + p.id + '" style="left:' + (p.fx * 1000) + "px;top:" + (p.fy * 1000) +
-          'px" aria-label="' + esc(p.name) + '"><span class="lbl" hidden>' + esc(p.name) + "</span></button>";
+        return '<button class="pin ' + esc(p.kind) + (dcol(p.district) ? " dc" : "") + '" tabindex="-1" data-id="' + p.id + '" style="left:' + (p.fx * 1000) + "px;top:" + (p.fy * 1000) +
+          "px" + (dcol(p.district) ? ";--dc:" + dcol(p.district) : "") + '" aria-label="' + esc(p.name) + (p.district ? ", " + esc(p.district) : "") + '"><span class="lbl" hidden>' + esc(p.name) + "</span></button>";
       }).join("") + '</div><div class="pop" id="pop" hidden role="dialog" aria-label="Place" tabindex="-1"></div><div class="zoom"><button id="zin" aria-label="Zoom in">+</button>' +
       '<button id="zout" aria-label="Zoom out">-</button><button id="zfit">Fit</button></div></div>');
     var map = document.getElementById("map"), stage = document.getElementById("stage"), pop = document.getElementById("pop");
@@ -305,7 +356,15 @@
         var p = places.filter(function (x) { return x.id === b.dataset.id; })[0];
         b.classList.toggle("dim", !!d && p.district !== d);
       });
+      document.querySelectorAll("#mlegend button").forEach(function (b) { b.setAttribute("aria-pressed", b.dataset.d === d ? "true" : "false"); });
       placeLabels();
+    };
+    var legend = document.getElementById("mlegend");
+    if (legend) legend.onclick = function (e) {
+      var b = e.target.closest("button[data-d]"); if (!b) return;
+      var sel = document.getElementById("mdist");
+      sel.value = sel.value === b.dataset.d ? "" : b.dataset.d;   // a second click shows every district again
+      sel.onchange();
     };
     document.getElementById("mlbl").onchange = function () { labelsOn = this.checked; placeLabels(); };
     document.getElementById("mfind").onchange = function () {
@@ -356,7 +415,9 @@
       mentioned(c.name, "creatures", c.id);
       return;
     }
-    A.listPage({title: "Creatures", rows: A.data.creatures, wide: true, lede: "Yokai, beasts, spirits and the kinds of people the isles send against you.",
+    A.listPage({title: "Creatures", rows: A.data.creatures, wide: true, lede: "Yokai, beasts, spirits and the kinds of people the isles send against you. " +
+      "Pick a damage type to see what it hurts.",
+      facet: {weak: function (r) { return r.weak; }, resist: function (r) { return r.resist; }}, names: {weak: "Weak to", resist: "Resists"},
       card: function (r) { return card("creatures", r, (r.weak.length ? "weak to " + esc(r.weak.join(", ")) : "")); },
       table: [{h: "Creature", v: function (r) { return r.name; }, html: nameCell("creatures")},
               {h: "Weak to", v: function (r) { return r.weak.join(", "); }, html: function (r) { return esc(r.weak.join(", ")); }},
@@ -407,7 +468,7 @@
     A.h(crumbs([["Skills"]]) + '<h1>Skills</h1><p class="lede">The isles\' arts. Each names what it covers, what it does not, and examples by difficulty.</p>' +
       A.data.skills.map(function (s) {
         return '<h2 class="cap" id="' + s.id + '" data-toc="' + esc(s.name) + '">' + esc(s.name) + ' <span class="tag">' + esc(s.type) + '</span> <span class="tag">' + esc(s.attribute) + '</span></h2><div class="prose">' +
-          A.prose(s.info) + "</div>";
+          A.prose(s.info) + A.depth.ladderHtml(s.name) + "</div>";
       }).join(""));
   };
   var kv = A.bonuses;
@@ -569,7 +630,7 @@
           var lv = places.map(function (l) { return l.levels || []; }).reduce(function (a, b) { return a.concat(b); }, []);
           var band = lv.length ? Math.min.apply(null, lv) + "-" + Math.max.apply(null, lv) : "";
           var lr = lore(n);
-          return '<a class="card" href="districts/' + sl(n) + '/"><div class="pic land">' + A.img(hub.img, n) + '</div><div class="body"><div class="t">' +
+          return '<a class="card dc" href="districts/' + sl(n) + '/"' + accent(n) + '><div class="pic land">' + A.img(hub.img, n) + '</div><div class="body"><div class="t">' +
             esc(n) + '</div><div class="s">' + places.length + " places" + (band ? " · level " + band : "") + '</div><div class="x">' +
             esc(lr ? A.first(lr.info.replace(/^.*? is a district of the Asagiri Isles\. /, ""), 140) : "") + "</div></div></a>";
         }).join("") + "</div>");
@@ -583,7 +644,7 @@
     var people = uniq(A.data.npcs.filter(function (n) { return here[n.location]; }));
     var facs = {}; all[name].forEach(function (l) { l.factions.forEach(function (f) { facs[f] = 1; }); });
     var lr = lore(name);
-    A.h(crumbs([["Districts", "districts/"], [name]]) + "<h1>" + esc(name) + '</h1><div class="prose">' + (lr ? A.prose(lr.info, name) : "") +
+    A.h(crumbs([["Districts", "districts/"], [name]]) + '<h1 class="dh"' + accent(name) + ">" + esc(name) + '</h1><div class="prose">' + (lr ? A.prose(lr.info, name) : "") +
       "</div><p>" + (isles ? '<a href="map/' + isles.id + "/?district=" + encodeURIComponent(name) + '">Show it on the map</a> · ' : "") +
       '<a href="people/?district=' + encodeURIComponent(name) + '">Everyone here</a></p>' +
       "<h2>Places before the war</h2><div class='grid'>" + before.map(function (l) { return card("places", l, esc(l.kind) + (levels(l.levels) ? " · lv " + levels(l.levels) : ""), true); }).join("") + "</div>" +
@@ -822,26 +883,47 @@
 
   A.pages.planner = function () {
     var cats = A.data.categories, C = A.data.creation;
-    var picked = {};
-    var fromUrl = A.param("pick");
-    if (fromUrl) fromUrl.split("|").forEach(function (n) { var t = A.byName("traits", n); if (t) picked[t.category] = n; });
-    else picked = A.tryStore(KEY) || {};
+    // two builds, A and B, side by side in "Compare"; a shared link carries both (?pick= and ?vs=)
+    var stored = A.tryStore(KEY) || {};
+    var builds = stored.A || stored.B ? {A: stored.A || {}, B: stored.B || {}} : {A: stored, B: {}};   // an older save was one build
+    var parse = function (str) {
+      var out = {};
+      str.split("|").forEach(function (n) { var t = A.byName("traits", n); if (t) out[t.category] = n; });
+      return out;
+    };
+    if (A.param("pick")) builds = {A: parse(A.param("pick")), B: A.param("vs") ? parse(A.param("vs")) : {}};
+    var slot = "A", mode = "edit", picked = builds.A;
     A.h('<div class="crumbs"><a href="./">Home</a> / Character planner</div><h1>Character planner</h1><p class="lede">Every pick the ' +
       "creator offers, in its order, with the same unlocks and exclusions: choose a Tradition and its Lineages open, and so on. The " +
       'totals add up what your picks give. Rules: <a href="mechanics/paths-and-ladders/">Paths and Ladders</a>, ' +
-      '<a href="mechanics/how-fighting-works/">How Fighting Works</a>.</p><div class="article"><div id="pcats"></div>' +
+      '<a href="mechanics/how-fighting-works/">How Fighting Works</a>.</p><nav class="tabs" aria-label="Builds" id="pslots">' +
+      '<a href="planner/" data-slot="A">Build A</a><a href="planner/" data-slot="B">Build B</a><a href="planner/" data-slot="cmp">Compare A and B</a></nav>' +
+      '<div class="article"><div id="pcats"></div>' +
       '<aside class="infobox" id="ptotal"></aside></div>');
-    function draw() {
+    function prune(p) {
       var changed = true, dropped = [];
       while (changed) {   // a pick whose unlocker went away is dropped, and that can drop others
         changed = false;
-        Object.keys(picked).forEach(function (c) {
-          var t = A.byName("traits", picked[c]);
-          var rest = {}; Object.keys(picked).forEach(function (k) { if (k !== c) rest[k] = picked[k]; });
-          if (!t || !open(t, rest)) { dropped.push(picked[c]); delete picked[c]; changed = true; }
+        Object.keys(p).forEach(function (c) {
+          var t = A.byName("traits", p[c]);
+          var rest = {}; Object.keys(p).forEach(function (k) { if (k !== c) rest[k] = p[k]; });
+          if (!t || !open(t, rest)) { dropped.push(p[c]); delete p[c]; changed = true; }
         });
       }
-      A.tryStore(KEY, picked);
+      return dropped;
+    }
+    function draw() {
+      var dropped = prune(picked);
+      builds[slot] = picked;
+      A.tryStore(KEY, builds);
+      document.querySelectorAll("#pslots a").forEach(function (t) {
+        var on = mode === "compare" ? t.dataset.slot === "cmp" : t.dataset.slot === slot;
+        t.classList.toggle("on", on);
+        if (on) t.setAttribute("aria-current", "page"); else t.removeAttribute("aria-current");
+      });
+      document.getElementById("pcats").parentNode.classList.toggle("wide", mode === "compare");
+      document.getElementById("ptotal").hidden = mode === "compare";
+      if (mode === "compare") { prune(builds.A); prune(builds.B); compare(); return; }
       document.getElementById("pcats").innerHTML = (dropped.length ? '<p class="warn">No longer open, so left out: ' + dropped.map(esc).join(", ") + "</p>" : "") +
         cats.map(function (c) {
           var rest = {}; Object.keys(picked).forEach(function (k) { if (k !== c.name) rest[k] = picked[k]; });
@@ -865,13 +947,14 @@
         return ["" + esc(a.charAt(0).toUpperCase() + a.slice(1)), "<b>" + shown + "</b>" + (v !== C.start ? ' <span class="note">(' + (v > C.start ? "+" : "") + (v - C.start) + ")</span>" : "")];
       });
       var list = function (o) { return Object.keys(o).sort().map(function (k) { return esc(k) + " " + (o[k] > 0 ? "+" : "") + o[k]; }).join(", "); };
-      var url = location.origin + A.root + "planner/?pick=" + encodeURIComponent(Object.keys(picked).map(function (c) { return picked[c]; }).join("|"));
-      document.getElementById("ptotal").innerHTML = '<div class="hd">Your character</div><dl>' + attrs.map(function (r) { return "<dt>" + r[0] + "</dt><dd>" + r[1] + "</dd>"; }).join("") +
+      var join = function (b) { return encodeURIComponent(Object.keys(b).map(function (c) { return b[c]; }).join("|")); };
+      var url = location.origin + A.root + "planner/?pick=" + join(builds.A) + (Object.keys(builds.B).length ? "&vs=" + join(builds.B) : "");
+      document.getElementById("ptotal").innerHTML = '<div class="hd">Build ' + slot + "</div>" + '<dl>' + attrs.map(function (r) { return "<dt>" + r[0] + "</dt><dd>" + r[1] + "</dd>"; }).join("") +
         "<dt>Skills</dt><dd>" + (list(T.skills) || "-") + "</dd><dt>Resources</dt><dd>" + (list(T.res) || "-") + "</dd>" +
         "<dt>Abilities</dt><dd>" + (T.abilities.map(function (a) { var r = A.byName("abilities", a); return r ? '<a href="' + A.href("abilities", r.id) + '">' + esc(a) + "</a>" : esc(a); }).join(", ") || "-") + "</dd>" +
         "<dt>Starts with</dt><dd>" + (T.items.map(esc).join(", ") || "-") + "</dd></dl>" +
         (warn.length ? '<div class="say warn" style="margin:0 12px 12px">' + warn.map(esc).join("<br>") + "</div>" : "") +
-        '<div style="padding:0 12px 12px"><button id="pshare">Copy a link to this build</button> <button id="pclear">Start over</button></div>';
+        '<div style="padding:0 12px 12px"><button id="pshare">' + (Object.keys(builds.B).length ? "Copy a link to builds A and B" : "Copy a link to this build") + "</button>" + ' <button id="pclear">Start over</button></div>';
       document.getElementById("pshare").onclick = function () {
         var b = this;
         if (navigator.clipboard) navigator.clipboard.writeText(url).then(function () { b.textContent = "Link copied"; }, function () { b.textContent = url; });
@@ -879,6 +962,33 @@
       };
       document.getElementById("pclear").onclick = function () { picked = {}; draw(); };
     }
+    /* the two builds' picks and totals in one table, the difference marked */
+    function compare() {
+      var TA = totals(builds.A), TB = totals(builds.B);
+      var row = function (label, a, b, num) {
+        var diff = num && a !== b ? ' <span class="' + (b > a ? "ok" : "no") + '">(' + (b > a ? "+" : "") + (b - a) + ")</span>" : "";
+        return "<tr><th scope=\"row\">" + esc(label) + "</th><td>" + (a === "" || a == null ? "-" : esc(a)) + "</td><td" + (a !== b ? ' class="cmpdiff"' : "") + ">" +
+          (b === "" || b == null ? "-" : esc(b)) + diff + "</td></tr>";
+      };
+      var keys = function (x, y) { var k = {}; Object.keys(x).concat(Object.keys(y)).forEach(function (n) { k[n] = 1; }); return Object.keys(k).sort(); };
+      var html = '<div class="tablewrap"><table class="cmp"><thead><tr><th></th><th>Build A</th><th>Build B</th></tr></thead><tbody>' +
+        cats.filter(function (c) { return builds.A[c.name] || builds.B[c.name]; }).map(function (c) {
+          return row(c.name, builds.A[c.name] || "", builds.B[c.name] || "");
+        }).join("") +
+        '<tr><th colspan="3">Stats</th></tr>' + C.attributes.map(function (a) { return row(a, Math.min(TA.attr[a], C.max), Math.min(TB.attr[a], C.max), true); }).join("") +
+        '<tr><th colspan="3">Skills</th></tr>' + keys(TA.skills, TB.skills).map(function (k) { return row(k, TA.skills[k] || 0, TB.skills[k] || 0, true); }).join("") +
+        '<tr><th colspan="3">Resources</th></tr>' + keys(TA.res, TB.res).map(function (k) { return row(k, TA.res[k] || 0, TB.res[k] || 0, true); }).join("") +
+        row("Abilities", TA.abilities.join(", "), TB.abilities.join(", ")) + row("Starts with", TA.items.join(", "), TB.items.join(", ")) +
+        "</tbody></table></div>";
+      document.getElementById("pcats").innerHTML = html;
+    }
+    document.getElementById("pslots").addEventListener("click", function (e) {
+      var t = e.target.closest("[data-slot]"); if (!t) return;
+      e.preventDefault(); e.stopPropagation();   // a tab here, not a page change
+      if (t.dataset.slot === "cmp") mode = "compare";
+      else { mode = "edit"; builds[slot] = picked; slot = t.dataset.slot; picked = builds[slot]; }
+      draw();
+    });
     document.getElementById("pcats").addEventListener("change", function (e) {
       var s = e.target.closest("select[data-cat]"); if (!s) return;
       if (s.value) picked[s.dataset.cat] = s.value; else delete picked[s.dataset.cat];

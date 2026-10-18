@@ -234,7 +234,11 @@
     function rows() {
       var q = state.q.toLowerCase();
       return opt.rows.filter(function (r) {
-        for (var k in state.f) if (state.f[k] && String(opt.facet[k](r)) !== state.f[k]) return false;
+        for (var k in state.f) {
+          if (!state.f[k]) continue;
+          var v = opt.facet[k](r);   // a facet may give a list (a creature is weak to several things): any one matches
+          if (Array.isArray(v) ? v.indexOf(state.f[k]) < 0 : String(v) !== state.f[k]) return false;
+        }
         return !q || (r.name + " " + (r.info || "")).toLowerCase().indexOf(q) >= 0;
       });
     }
@@ -263,7 +267,10 @@
     }
     var facets = Object.keys(opt.facet || {}).map(function (k) {
       var vals = {};
-      opt.rows.forEach(function (r) { var v = opt.facet[k](r); if (v !== "" && v != null) vals[v] = 1; });
+      opt.rows.forEach(function (r) {
+        var v = opt.facet[k](r);
+        (Array.isArray(v) ? v : [v]).forEach(function (x) { if (x !== "" && x != null) vals[x] = 1; });
+      });
       var keys = Object.keys(vals).sort(opt.sorts && opt.sorts[k] || undefined);
       return '<select data-f="' + k + '" aria-label="' + (opt.names || {})[k] + '"><option value="">' + (opt.names || {})[k] + ": all</option>" +
         keys.map(function (v) { return '<option' + (state.f[k] === v ? " selected" : "") + ">" + App.esc(v) + "</option>"; }).join("") + "</select>";
