@@ -27,6 +27,7 @@
     {k: "people", d: "npcs", label: "People", g: "World"},
     {k: "places", d: "locations", label: "Places", g: "World"},
     {k: "map", label: "Map", g: "World"},
+    {k: "districts", label: "Districts", g: "World"},
     {k: "factions", d: "factions", label: "Factions", g: "World"},
     {k: "creatures", d: "creatures", label: "Creatures", g: "World"},
     {k: "lore", d: "lore", label: "Lore", g: "World"},
@@ -177,14 +178,20 @@
       if (lines.every(function (l) { return /^\s*- /.test(l); })) {
         return "<ul>" + lines.map(function (l) { return "<li>" + inline(l.replace(/^\s*- /, "")) + "</li>"; }).join("") + "</ul>";
       }
-      var html = "", list = [];
+      // runs of list lines become a <ul>, runs of other lines a <p>: a <ul> inside a <p> is split by the browser and the
+      // text after it falls out of the paragraph (it lost the prose size on phones)
+      var out = "", list = [], para = [];
+      var flush = function () {
+        if (para.length) { out += "<p>" + para.join("<br>") + "</p>"; para = []; }
+        if (list.length) { out += "<ul>" + list.join("") + "</ul>"; list = []; }
+      };
       lines.forEach(function (l) {
-        if (/^\s*- /.test(l)) { list.push("<li>" + inline(l.replace(/^\s*- /, "")) + "</li>"); return; }
-        if (list.length) { html += "<ul>" + list.join("") + "</ul>"; list = []; }
-        html += (html && !/<\/ul>$/.test(html) ? "<br>" : "") + inline(l);
+        if (/^\s*- /.test(l)) { if (para.length) flush(); list.push("<li>" + inline(l.replace(/^\s*- /, "")) + "</li>"); return; }
+        if (list.length) flush();
+        para.push(inline(l));
       });
-      if (list.length) html += "<ul>" + list.join("") + "</ul>";
-      return "<p>" + html + "</p>";
+      flush();
+      return out;
     }).join("");
   };
   App.first = function (text, n) {
@@ -259,9 +266,67 @@
     catch (e) { App.h("<h1>Something went wrong</h1><p class='note'>" + App.esc(e.message) + "</p>"); throw e; }
     if (!/^map/.test(key)) window.scrollTo(0, 0);
     document.title = (document.querySelector("main h1") || {}).textContent + " · Asagiri Lorebook";
+    onThisPage();
     if (routed) document.getElementById("main").focus({preventScroll: true});   // the new page, not the top of the old one
     routed = true;
   }
+
+  /* "On this page": a page with 3+ sections gets a sticky list of them beside it (Vector 2022's TOC; research/lorebook-layout.md).
+     Existing nodes are MOVED into the layout, never re-rendered, so every listener a page set stays live. */
+  var tocWatch = null;
+  function onThisPage() {
+    if (tocWatch) { tocWatch.disconnect(); tocWatch = null; }
+    var main = document.getElementById("main");
+    var heads = [].slice.call(main.querySelectorAll("h2"));
+    if (heads.length < 3) return;
+    var toc = document.createElement("nav");
+    toc.className = "toc";
+    toc.setAttribute("aria-label", "On this page");
+    toc.innerHTML = "<b>On this page</b>" + heads.map(function (h, i) {
+      h.id = "sec-" + i;
+      var label = h.dataset.toc || h.textContent;   // a heading carrying chips names its own label
+      return '<button type="button" data-sec="' + i + '"' + (h.classList.contains("cap") ? ' style="text-transform:capitalize"' : "") + ">" +
+        App.esc(label) + "</button>";
+    }).join("");
+    toc.addEventListener("click", function (e) {
+      var b = e.target.closest("[data-sec]"); if (!b) return;
+      var h = document.getElementById("sec-" + b.dataset.sec);
+      h.scrollIntoView({behavior: "smooth", block: "start"});
+      h.setAttribute("tabindex", "-1"); h.focus({preventScroll: true});
+    });
+    var rail = document.createElement("div");
+    rail.className = "rail";
+    var box = main.querySelector(".article > .infobox");
+    if (box) {
+      box.parentNode.insertBefore(rail, box);
+      rail.appendChild(box);
+    } else {
+      var grid = document.createElement("div"), col = document.createElement("div");
+      grid.className = "tocgrid";
+      var start = main.querySelector("h1");
+      var nodes = [].slice.call(main.childNodes);
+      var from = start ? nodes.indexOf(start) + 1 : 0;
+      nodes.slice(from).forEach(function (n) { col.appendChild(n); });
+      grid.appendChild(col); grid.appendChild(rail); main.appendChild(grid);
+    }
+    rail.appendChild(toc);
+    if ("IntersectionObserver" in window) {
+      tocWatch = new IntersectionObserver(function (entries) {
+        entries.forEach(function (en) {
+          if (!en.isIntersecting) return;
+          toc.querySelectorAll("button").forEach(function (b) { b.classList.toggle("on", b.dataset.sec === en.target.id.slice(4)); });
+        });
+      }, {rootMargin: "-20% 0px -70% 0px"});
+      heads.forEach(function (h) { tocWatch.observe(h); });
+    }
+  }
+
+  var top = document.createElement("button");
+  top.className = "totop"; top.type = "button"; top.textContent = "Top"; top.hidden = true;
+  top.setAttribute("aria-label", "Back to the top of the page");
+  top.addEventListener("click", function () { window.scrollTo({top: 0, behavior: "smooth"}); document.getElementById("main").focus({preventScroll: true}); });
+  document.body.appendChild(top);
+  window.addEventListener("scroll", function () { top.hidden = window.scrollY < 900; }, {passive: true});
   var routed = false;
 
   function drawer(on) {

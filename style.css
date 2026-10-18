@@ -28,10 +28,13 @@ nav.side a.on:focus-visible, .tabs a.on:focus-visible, button.primary:focus-visi
 .results a:focus-visible { outline-offset: -2px; }
 img { max-width: 100%; }
 [hidden] { display: none !important; }
+main:focus, h2[tabindex="-1"]:focus { outline: none; }   /* focus moved there by script, for screen readers: no ring */
 h1, h2, h3 { line-height: 1.2; margin: 0 0 var(--space-md); }
-h1 { font-size: 21px; letter-spacing: .01em; }
-h2 { font-size: 17px; margin-top: var(--space-xl); padding-bottom: var(--space-xs); border-bottom: 1px solid var(--color-border-subtle); }
-h3 { font-size: 15px; margin-top: var(--space-lg); }
+/* headings a clear step above the 17px prose (NN/g layer-cake scanning; research/lorebook-layout.md) */
+h1 { font-size: 21px; font-weight: 800; letter-spacing: .01em; }
+h2 { font-size: 21px; font-weight: 600; margin-top: var(--space-2xl); padding: 0 0 var(--space-xs) var(--space-md);
+  border-left: 4px solid var(--color-accent); border-bottom: 1px solid var(--color-border-subtle); scroll-margin-top: 96px; }
+h3 { font-size: 17px; margin-top: var(--space-xl); color: var(--color-text); scroll-margin-top: 96px; }
 p { margin: 0 0 var(--space-md); }
 code, kbd { font-family: var(--font-mono); font-size: 13px; }
 p code, li code { padding: var(--space-2xs) var(--space-xs); border-radius: var(--radius-sm); background: var(--color-surface-elev); }
@@ -63,7 +66,8 @@ nav.side a:hover { background: var(--color-surface-elev); color: var(--color-tex
 nav.side a.on { background: var(--color-selected-bg); color: var(--color-text-on-accent); }
 nav.side a span { color: var(--color-text-muted); font-size: 11px; }
 nav.side a.on span { color: var(--color-text-on-accent); }
-main { padding: var(--space-xl) var(--space-2xl) var(--space-3xl); min-width: 0; }
+/* one centred reading width on big screens (Vector 2022 caps content at 960-1244px) */
+main { padding: var(--space-xl) var(--space-2xl) var(--space-3xl); min-width: 0; width: 100%; max-width: 1320px; margin-inline: auto; }
 .crumbs { color: var(--color-text-muted); font-size: 13px; margin-bottom: var(--space-sm); }
 .lede { color: var(--color-text-muted); max-width: 72ch; }
 
@@ -101,7 +105,28 @@ button.primary:hover { background: var(--color-accent-hover); }
 
 /* article + infobox */
 .article { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: var(--space-2xl); align-items: start; }
-.prose > p, .prose > ul, .prose > h2, .prose > h3 { max-width: 76ch; }
+.article > .infobox { position: sticky; top: calc(var(--top-h, 56px) + var(--space-lg)); }
+.prose > p, .prose > ul, .prose > h2, .prose > h3 { max-width: 72ch; }
+.prose > p, .prose > ul { font-size: 17px; line-height: 1.7; }
+.prose li { margin-bottom: var(--space-xs); }
+.lede { font-size: 17px; line-height: 1.6; }
+/* the right rail: infobox, then "On this page" (sticky, Vector 2022's TOC) */
+.rail { display: flex; flex-direction: column; gap: var(--space-lg); position: sticky; top: calc(var(--top-h, 56px) + var(--space-lg));
+  max-height: calc(100vh - var(--top-h, 56px) - var(--space-xl)); overflow: auto; }
+.tocgrid { display: grid; grid-template-columns: minmax(0, 1fr) 240px; gap: var(--space-2xl); align-items: start; }
+.toc { padding: var(--space-md) var(--space-lg); background: var(--color-surface); border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg); font-size: 13px; }
+.toc b { display: block; margin-bottom: var(--space-sm); color: var(--color-text-muted); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+.toc button { display: block; width: 100%; text-align: left; background: none; border: 0; border-left: 2px solid var(--color-border-subtle);
+  border-radius: 0; padding: var(--space-xs) var(--space-sm); color: var(--color-text-muted); font-size: 13px; }
+.toc button:hover { color: var(--color-text); background: var(--color-surface-elev); }
+.toc button:focus-visible { outline: 2px solid var(--color-accent-soft); outline-offset: -2px; }
+h2.cap { text-transform: capitalize; }
+.toc button.on { color: var(--color-text); border-left-color: var(--color-accent); }
+.totop { position: fixed; right: var(--space-lg); bottom: calc(var(--space-lg) + env(safe-area-inset-bottom, 0px)); z-index: 1100;
+  border-radius: var(--radius-full); padding: var(--space-sm) var(--space-lg); box-shadow: 0 4px 16px rgba(0, 0, 0, .4); }
+.kindhead { display: flex; align-items: baseline; gap: var(--space-sm); }
+.kindhead .count { font-weight: 400; }
 .tabs { display: flex; flex-wrap: wrap; gap: var(--space-sm); margin: 0 0 var(--space-lg); }
 .tabs a { padding: var(--space-xs) var(--space-md); border-radius: var(--radius-full); border: 1px solid var(--color-border-strong);
   color: var(--color-text-muted); font-size: 13px; }
@@ -117,7 +142,7 @@ button.primary:hover { background: var(--color-accent-hover); }
 .infobox dd { margin: 0; }
 .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--space-md); }
 .gallery figure { margin: 0; background: var(--color-surface); border: 1px solid var(--color-border-subtle); border-radius: var(--radius-lg); overflow: hidden; }
-.gallery img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; display: block; background: var(--color-surface-elev); }
+.gallery img, .gallery .noimg { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; display: block; background: var(--color-surface-elev); }
 .gallery figcaption { padding: var(--space-sm) var(--space-md) var(--space-md); font-size: 13px; color: var(--color-text-muted); }
 .gallery figcaption b { display: block; color: var(--color-text); margin-bottom: var(--space-2xs); }
 table { border-collapse: collapse; width: 100%; font-size: 13px; }
@@ -182,7 +207,9 @@ audio { width: 100%; height: 36px; }
   .pop { left: var(--space-sm); right: var(--space-sm); top: auto; bottom: var(--space-sm); width: auto; max-height: 45%; }
   .menu-btn { display: inline-block; }
   main { padding: var(--space-lg); }
-  .article, .cols { grid-template-columns: 1fr; }
+  .article, .cols, .tocgrid { grid-template-columns: 1fr; }
+  .rail, .article > .infobox { position: static; max-height: none; }
+  .tocgrid > .rail { order: -1; }
   .infobox { order: -1; }
   .infobox img { max-height: 300px; object-fit: cover; object-position: top; }
   .form { grid-template-columns: 1fr; }

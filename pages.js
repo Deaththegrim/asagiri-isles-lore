@@ -27,6 +27,9 @@
     if (!navigator.clipboard) { done("Select and copy"); return; }
     navigator.clipboard.writeText(text).then(function () { done("Copied"); }, function () { done("Select and copy"); });
   }
+  function districtLink(d) {
+    return '<a href="#/districts/' + d.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") + '">' + esc(d) + "</a>";
+  }
   function levels(lv) { return lv && lv.length ? lv.join("-") : ""; }
   function regionOf(name) { return A.byName("regions", name); }
   function placeLink(name, area) {
@@ -42,7 +45,7 @@
   /* ---------- home ---------- */
   P[""] = function () {
     var d = A.data, isles = regionOf("The Asagiri Isles");
-    var tiles = [["people", A.count("npcs"), "people"], ["places", d.locations.length, "places"], ["factions", d.factions.length, "factions"],
+    var tiles = [["people", A.count("npcs"), "people"], ["places", d.locations.length, "places"], ["districts", Object.keys(districtsAll()).length, "districts"], ["factions", d.factions.length, "factions"],
                  ["creatures", d.creatures.length, "creatures"], ["items", d.items.length, "items"], ["abilities", d.abilities.length, "abilities"],
                  ["traits", d.traits.length, "traits"], ["lore", d.lore.length, "lore entries"], ["mechanics", d.books.length, "guide books"],
                  ["say", d.say.length, "typed actions"], ["starts", d.starts.length, "story starts"], ["music", d.music.length, "tracks"]];
@@ -88,7 +91,7 @@
       }).join("") + "</div>" : "") + "</div>" +
       A.infobox(n.name, n.img || (versions.filter(function (o) { return o.img; })[0] || {}).img, [["Type", esc(n.type)], ["Gender", esc(n.gender)], ["Tier", esc(n.tier)], ["Level", n.level],
         ["Faction", n.faction ? A.nameLink("factions", n.faction) : ""], ["Home", n.location ? placeLink(n.location, n.area) : ""],
-        ["District", place ? esc(place.district) : ""], ["Era", place ? era(place.region) : ""],
+        ["District", place && place.district ? districtLink(place.district) : ""], ["Era", place ? era(place.region) : ""],
         ["Map", place && regionOf(place.region) ? '<a href="#/map/' + regionOf(place.region).id + "?pin=" + place.id + '">Show on map</a>' : ""]]) +
       "</div>");
   }
@@ -123,10 +126,10 @@
         return '<li><a href="#/say/' + h.f.key + '">' + esc(h.f.label) + "</a>" + (h.t.examples[0] ? ": <code>" + esc(h.t.examples[0]) + "</code>" : "") + "</li>";
       }).join("") + "</ul>" : "") +
       (p.areas.length ? "<h2>Areas</h2><div class='gallery'>" + p.areas.map(function (a) {
-        return "<figure>" + (a.img ? A.img(a.img, a.name) : "") + "<figcaption><b>" + esc(a.name) + "</b>" + A.link(esc(a.text.split("\n")[0]), p.name) + "</figcaption></figure>";
+        return "<figure>" + (a.img ? A.img(a.img, a.name) : '<div class="noimg" role="img" aria-label="No picture yet"></div>') + "<figcaption><b>" + esc(a.name) + "</b>" + A.link(esc(a.text.split("\n")[0]), p.name) + "</figcaption></figure>";
       }).join("") + "</div>" : "") +
       (people.length ? "<h2>People here</h2><div class='grid'>" + people.map(function (n) { return card("people", n, esc(n.type)); }).join("") + "</div>" : "") +
-      "</div>" + A.infobox(p.name, p.img, [["District", esc(p.district)], ["Region", esc(p.region)], ["Era", era(p.region)],
+      "</div>" + A.infobox(p.name, p.img, [["District", p.district ? districtLink(p.district) : ""], ["Region", esc(p.region)], ["Era", era(p.region)],
         ["Kind", esc(p.kind)], ["Levels", levels(p.levels)], ["Factions", p.factions.map(function (f) { return A.nameLink("factions", f); }).join(" · ")],
         ["Map", reg && reg.map ? '<a href="#/map/' + reg.id + "?pin=" + p.id + '">Show on map</a>' : ""]]) + "</div>");
   }
@@ -136,6 +139,7 @@
     var regs = A.data.regions.filter(function (r) { return r.map && A.data.locations.some(function (l) { return l.region === r.name; }); });
     var reg = regs.filter(function (r) { return r.id === id; })[0] || regs.filter(function (r) { return r.name === "The Asagiri Isles"; })[0] || regs[0];
     var pinId = (location.hash.split("pin=")[1] || "").split("&")[0];
+    var distPick = decodeURIComponent((location.hash.split("district=")[1] || "").split("&")[0]);
     var places = A.data.locations.filter(function (l) { return l.region === reg.name; });
     var dists = {}; places.forEach(function (p) { if (p.district) dists[p.district] = 1; });
     var main = ["The Asagiri Isles", "The Asagiri Isles, After the War", "The Otherworld"];
@@ -246,6 +250,7 @@
       if (p && p.region === reg.name) { keyed = true; lastFocus = this; focus(p); }
     };
     fit();
+    if (distPick && dists[distPick]) { document.getElementById("mdist").value = distPick; document.getElementById("mdist").onchange(); }
     var start = places.filter(function (p) { return p.id === pinId; })[0];
     if (start) focus(start);
   };
@@ -332,7 +337,7 @@
   P.skills = function () {
     A.h(crumbs([["Skills"]]) + '<h1>Skills</h1><p class="lede">The isles\' arts. Each names what it covers, what it does not, and examples by difficulty.</p>' +
       A.data.skills.map(function (s) {
-        return '<h2 id="' + s.id + '">' + esc(s.name) + ' <span class="tag">' + esc(s.type) + '</span> <span class="tag">' + esc(s.attribute) + '</span></h2><div class="prose">' +
+        return '<h2 class="cap" id="' + s.id + '" data-toc="' + esc(s.name) + '">' + esc(s.name) + ' <span class="tag">' + esc(s.type) + '</span> <span class="tag">' + esc(s.attribute) + '</span></h2><div class="prose">' +
           A.prose(s.info) + "</div>";
       }).join(""));
   };
@@ -412,11 +417,69 @@
         }).join("") + "</div>";
       }).join(""));
   };
+  /* results grouped by kind, best kinds first (people and places), each group's best matches first */
   P.search = function () {
     var q = decodeURIComponent((location.hash.split("q=")[1] || "").split("&")[0]);
-    var list = A.search(q);
-    A.h(crumbs([["Search"]]) + "<h1>Results for \"" + esc(q) + '"</h1><p class="count">' + list.length + ' found</p><div class="grid wide">' +
-      list.slice(0, 300).map(function (e) { return card(e.kind, A.byId[e.kind + "/" + e.id], e.kind); }).join("") + "</div>");
+    var list = A.search(q), groups = {}, order = [];
+    list.forEach(function (e) { if (!groups[e.kind]) { groups[e.kind] = []; order.push(e.kind); } groups[e.kind].push(e); });
+    var label = {people: "People", places: "Places", factions: "Factions", creatures: "Creatures", lore: "Lore", mechanics: "Guide books",
+                 abilities: "Abilities", traits: "Traits", skills: "Skills", items: "Items", starts: "Story starts", map: "Maps"};
+    A.h(crumbs([["Search"]]) + "<h1>Results for \"" + esc(q) + '"</h1><p class="count">' + list.length + " found in " + order.length + " kinds</p>" +
+      (list.length ? "" : '<p class="lede">Nothing matches. Try one word of a name, or a place.</p>') +
+      order.map(function (k) {
+        var rows = groups[k];
+        return '<h2 class="kindhead" data-toc="' + esc(label[k] || k) + '">' + esc(label[k] || k) + ' <span class="count">' + rows.length + "</span></h2><div class='grid" +
+          (k === "people" || k === "places" ? "" : " wide") + "'>" + rows.slice(0, 60).map(function (e) {
+            var r = A.byId[e.kind + "/" + e.id];
+            return card(e.kind, r, esc(r.type || r.district || r.category || ""), e.kind === "places");
+          }).join("") + "</div>" + (rows.length > 60 ? '<p class="note">' + (rows.length - 60) + " more: narrow the search.</p>" : "");
+      }).join(""));
+  };
+
+  /* ---------- districts: the hub pages (the district's lore, its places, people and factions) ---------- */
+  function districtsAll() {
+    var out = {};
+    A.data.locations.forEach(function (l) { if (l.district) (out[l.district] = out[l.district] || []).push(l); });
+    return out;
+  }
+  P.districts = function (id) {
+    var all = districtsAll(), names = Object.keys(all).sort();
+    var sl = function (n) { return n.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""); };
+    var lore = function (n) { return A.byName("lore", "District: " + n); };
+    var isles = regionOf("The Asagiri Isles");
+    if (!id) {
+      A.h(crumbs([["Districts"]]) + '<h1>Districts</h1><p class="lede">The isles are twelve districts on one map, from the gentle plain around ' +
+        'Miyako to the ice of Hyoga Reach. Each one\'s level band covers everything in it.</p><div class="grid wide">' +
+        names.map(function (n) {
+          var places = all[n].filter(function (l) { return l.region === "The Asagiri Isles"; });
+          var hub = places.filter(function (l) { return l.img; })[0] || {};
+          var lv = places.map(function (l) { return l.levels || []; }).reduce(function (a, b) { return a.concat(b); }, []);
+          var band = lv.length ? Math.min.apply(null, lv) + "-" + Math.max.apply(null, lv) : "";
+          var lr = lore(n);
+          return '<a class="card" href="#/districts/' + sl(n) + '"><div class="pic land">' + A.img(hub.img, n) + '</div><div class="body"><div class="t">' +
+            esc(n) + '</div><div class="s">' + places.length + " places" + (band ? " · level " + band : "") + '</div><div class="x">' +
+            esc(lr ? A.first(lr.info.replace(/^.*? is a district of the Asagiri Isles\. /, ""), 140) : "") + "</div></div></a>";
+        }).join("") + "</div>");
+      return;
+    }
+    var name = names.filter(function (n) { return sl(n) === id; })[0];
+    if (!name) return missing("Districts");
+    var before = all[name].filter(function (l) { return l.region === "The Asagiri Isles"; });
+    var after = all[name].filter(function (l) { return l.region === "The Asagiri Isles, After the War"; });
+    var here = {}; all[name].forEach(function (l) { here[l.name] = 1; });
+    var people = uniq(A.data.npcs.filter(function (n) { return here[n.location]; }));
+    var facs = {}; all[name].forEach(function (l) { l.factions.forEach(function (f) { facs[f] = 1; }); });
+    var lr = lore(name);
+    A.h(crumbs([["Districts", "#/districts"], [name]]) + "<h1>" + esc(name) + '</h1><div class="prose">' + (lr ? A.prose(lr.info, name) : "") +
+      "</div><p>" + (isles ? '<a href="#/map/' + isles.id + "?district=" + encodeURIComponent(name) + '">Show it on the map</a> · ' : "") +
+      '<a href="#/people?district=' + encodeURIComponent(name) + '">Everyone here</a></p>' +
+      "<h2>Places before the war</h2><div class='grid'>" + before.map(function (l) { return card("places", l, esc(l.kind) + (levels(l.levels) ? " · lv " + levels(l.levels) : ""), true); }).join("") + "</div>" +
+      (after.length ? "<h2>Places after the war</h2><div class='grid'>" + after.map(function (l) { return card("places", l, esc(l.kind) + (levels(l.levels) ? " · lv " + levels(l.levels) : ""), true); }).join("") + "</div>" : "") +
+      (Object.keys(facs).length ? "<h2>Factions here</h2><div class='grid wide'>" + Object.keys(facs).sort().map(function (f) {
+        var r = A.byName("factions", f); return r ? card("factions", r, esc(r.type)) : "";
+      }).join("") + "</div>" : "") +
+      (people.length ? "<h2>People</h2><div class='grid'>" + people.slice(0, 48).map(function (n) { return card("people", n, esc(n.type)); }).join("") + "</div>" +
+        (people.length > 48 ? '<p><a href="#/people?district=' + encodeURIComponent(name) + '">All ' + people.length + " people of " + esc(name) + "</a></p>" : "") : ""));
   };
 
   /* ---------- what to say ---------- */
