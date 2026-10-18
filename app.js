@@ -269,7 +269,10 @@
     var key = parts[0] || "";
     nav(key);
     drawer(false);
-    var page = App.pages[key] || App.pages[""];
+    var page = App.pages[key] || function () {   // an address that is no page (GitHub serves 404.html for it)
+      App.h('<div class="crumbs"><a href="./">Home</a></div><h1>Not in the lorebook</h1><p class="lede">Nothing is at this address. ' +
+            "Try the search above, or start from the home page.</p>");
+    };
     try { page(parts.slice(1).join("/")); }
     catch (e) { App.h("<h1>Something went wrong</h1><p class='note'>" + App.esc(e.message) + "</p>"); throw e; }
     if (!/^map/.test(key)) window.scrollTo(0, 0);
