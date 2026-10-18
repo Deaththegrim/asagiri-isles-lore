@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Asagiri Lorebook</title>
+<meta name="description" content="The encyclopedia of The Asagiri Isles, a Voyage world: people, places, the map, factions, creatures, items, abilities, mechanics and what to say.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <button class="menu-btn" id="menu" aria-controls="side" aria-expanded="false">Menu</button>
+  <a class="brand" href="#/">Asagiri Lorebook<small>The Asagiri Isles · Voyage</small></a>
+  <div class="search" role="search">
+    <input id="q" type="search" role="combobox" aria-autocomplete="list" aria-expanded="false" placeholder="Search people, places, items, abilities, lore..." autocomplete="off" aria-label="Search the lorebook" aria-controls="results">
+    <div class="results" id="results" hidden role="listbox"></div>
+  </div>
+</header>
+<div class="shell">
+  <nav class="side" id="side" aria-label="Sections"></nav>
+  <main id="main" tabindex="-1"><p class="note">Loading the isles...</p></main>
+</div>
+<script src="app.js"></script>
+<script src="bench.js"></script>
+<script src="pages.js"></script>
+</body>
+</html>
