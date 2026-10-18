@@ -30,6 +30,24 @@
   function districtLink(d) {
     return '<a href="districts/' + d.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") + '/">' + esc(d) + "</a>";
   }
+  var KINDNAME = {people: "People", places: "Places", factions: "Factions", creatures: "Creatures", lore: "Lore", mechanics: "Guide books",
+                  items: "Items", starts: "Story starts"};
+  /* appends "Mentioned on" to the entry's main column (after the page has drawn, so its own listeners stay) */
+  function mentioned(name, kind, id) {
+    var list = A.mentions(name, kind, id), col = document.querySelector("main .article > .prose, main > .prose");
+    if (!list.length || !col) return;
+    var by = {};
+    list.forEach(function (m) { (by[m.kind] = by[m.kind] || []).push(m.r); });
+    var sec = document.createElement("section");
+    sec.innerHTML = "<h2>Mentioned on</h2>" + Object.keys(by).map(function (k) {
+      var rows = by[k];
+      return "<p><strong>" + esc(KINDNAME[k] || k) + ":</strong> " + rows.slice(0, 30).map(function (r) {
+        return '<a href="' + A.href(k, r.id) + '">' + esc(r.name) + "</a>";
+      }).join(", ") + (rows.length > 30 ? ' <span class="note">and ' + (rows.length - 30) + " more</span>" : "") + "</p>";
+    }).join("");
+    col.appendChild(sec);
+  }
+  function nameCell(kind) { return function (r) { return '<a href="' + A.href(kind, r.id) + '">' + esc(r.name) + "</a>"; }; }
   function levels(lv) { return lv && lv.length ? lv.join("-") : ""; }
   function regionOf(name) { return A.byName("regions", name); }
   function placeLink(name, area) {
@@ -94,6 +112,7 @@
         ["District", place && place.district ? districtLink(place.district) : ""], ["Era", place ? era(place.region) : ""],
         ["Map", place && regionOf(place.region) ? '<a href="map/' + regionOf(place.region).id + "/?pin=" + place.id + '">Show on map</a>' : ""]]) +
       "</div>");
+    mentioned(n.name, "people", n.id);
   }
 
   /* ---------- places ---------- */
@@ -132,6 +151,7 @@
       "</div>" + A.infobox(p.name, p.img, [["District", p.district ? districtLink(p.district) : ""], ["Region", esc(p.region)], ["Era", era(p.region)],
         ["Kind", esc(p.kind)], ["Levels", levels(p.levels)], ["Factions", p.factions.map(function (f) { return A.nameLink("factions", f); }).join(" · ")],
         ["Map", reg && reg.map ? '<a href="map/' + reg.id + "/?pin=" + p.id + '">Show on map</a>' : ""]]) + "</div>");
+    mentioned(p.name, "places", p.id);
   }
 
   /* ---------- map ---------- */
@@ -313,6 +333,7 @@
         (members.length ? "<h2>Members</h2><div class='grid'>" + members.map(function (n) { return card("people", n, esc(n.type)); }).join("") + "</div>" : "") +
         "</div>" + A.infobox(f.name, null, [["Kind", esc(f.type)], ["Members", members.length || ""],
           ["Holds", seats.slice(0, 12).map(function (l) { return placeLink(l.name); }).join(" · ")]]) + "</div>");
+      mentioned(f.name, "factions", f.id);
       return;
     }
     A.listPage({title: "Factions", rows: A.data.factions, wide: true, lede: "The houses, villages, courts and bands you can swear to, work for or cross.",
@@ -332,10 +353,15 @@
           return card("people", n, n.level ? "level " + n.level : "");
         }).join("") + "</div>" : "") + "</div>" +
         A.infobox(c.name, met[0] && met[0].img, [["Weak to", tags(c.weak, "weak")], ["Resists", tags(c.resist, "strong")], ["Immune", tags(c.immune, "boss")]]) + "</div>");
+      mentioned(c.name, "creatures", c.id);
       return;
     }
     A.listPage({title: "Creatures", rows: A.data.creatures, wide: true, lede: "Yokai, beasts, spirits and the kinds of people the isles send against you.",
-      card: function (r) { return card("creatures", r, (r.weak.length ? "weak to " + esc(r.weak.join(", ")) : "")); }});
+      card: function (r) { return card("creatures", r, (r.weak.length ? "weak to " + esc(r.weak.join(", ")) : "")); },
+      table: [{h: "Creature", v: function (r) { return r.name; }, html: nameCell("creatures")},
+              {h: "Weak to", v: function (r) { return r.weak.join(", "); }, html: function (r) { return esc(r.weak.join(", ")); }},
+              {h: "Resists", v: function (r) { return r.resist.join(", "); }, html: function (r) { return esc(r.resist.join(", ")); }},
+              {h: "Immune", v: function (r) { return r.immune.join(", "); }, html: function (r) { return esc(r.immune.join(", ")); }}]});
   };
 
   /* ---------- lore ---------- */
@@ -384,11 +410,15 @@
           A.prose(s.info) + "</div>";
       }).join(""));
   };
-  function kv(o) {
-    return Object.keys(o || {}).map(function (k) { var v = o[k]; return esc(k) + " " + (typeof v === "number" && v > 0 ? "+" + v : esc(JSON.stringify(v))); }).join(", ");
-  }
-  function needs(list) {
-    return (list || []).map(function (r) { return esc((r.type === "skill" ? "" : r.type + " ") + (r.variable || "") + " " + (r.amount != null ? r.amount : "")); }).join(", ");
+  var kv = A.bonuses;
+  /* an ability's requirements in words: "Forging 24", "Level 5", a trait as its own name (linked) */
+  function needs(list, plain) {   // plain: no links (inside a card, which is a link itself)
+    return (list || []).map(function (r) {
+      if (r.type === "skill") return esc((r.variable || "").charAt(0).toUpperCase() + (r.variable || "").slice(1) + " " + r.amount);
+      if (r.type === "characterLevel") return "Level " + esc(r.amount);
+      if (r.type === "trait") { var t = A.byName("traits", r.variable); return t && !plain ? '<a href="' + A.href("traits", t.id) + '">' + esc(r.variable) + "</a>" : esc(r.variable); }
+      return esc(r.type + " " + (r.variable || "") + " " + (r.amount != null ? r.amount : ""));
+    }).join(", ");
   }
   P.traits = function (id) {
     if (id) {
@@ -406,7 +436,12 @@
     }
     A.listPage({title: "Traits", rows: A.data.traits, wide: true, lede: "Every pick in character creation and the traits a story gives you.",
       facet: {category: function (r) { return r.category; }}, names: {category: "Category"},
-      card: function (r) { return card("traits", r, esc(r.category) + (kv(r.attributes) ? " · " + kv(r.attributes) : "")); }});
+      card: function (r) { return card("traits", r, esc(r.category) + (kv(r.attributes) ? " · " + kv(r.attributes) : "")); },
+      table: [{h: "Trait", v: function (r) { return r.name; }, html: nameCell("traits")},
+              {h: "Category", v: function (r) { return r.category; }, html: function (r) { return esc(r.category); }},
+              {h: "Attributes", v: function (r) { return kv(r.attributes); }, html: function (r) { return kv(r.attributes); }},
+              {h: "Skills", v: function (r) { return kv(r.skills); }, html: function (r) { return kv(r.skills); }},
+              {h: "Resources", v: function (r) { return kv(r.resources); }, html: function (r) { return kv(r.resources); }}]});
   };
   P.abilities = function (id) {
     if (id) {
@@ -417,8 +452,16 @@
       return;
     }
     A.listPage({title: "Abilities", rows: A.data.abilities, wide: true, lede: "Techniques, arts and powers, with what each needs.",
-      facet: {needs: function (r) { return r.needs[0] ? r.needs[0].type === "skill" ? r.needs[0].variable : r.needs[0].type : "none"; }}, names: {needs: "Needs"},
-      card: function (r) { return card("abilities", r, needs(r.needs)); }});
+      facet: {needs: function (r) {
+        var q = r.needs[0];
+        return !q ? "nothing" : q.type === "skill" ? q.variable : q.type === "characterLevel" ? "a level" : "a trait";
+      }}, names: {needs: "Needs"},
+      card: function (r) { return card("abilities", r, needs(r.needs, true)); },
+      table: [{h: "Ability", v: function (r) { return r.name; }, html: nameCell("abilities")},
+              {h: "Needs", v: function (r) { return r.needs[0] ? (r.needs[0].variable || r.needs[0].type) + " " + String(1000 + (r.needs[0].amount || 0)) : ""; },
+               html: function (r) { return needs(r.needs); }},
+              {h: "Power", v: function (r) { return Number(r.bonus) || 0; }, html: function (r) { return r.bonus == null ? "" : esc(r.bonus); }},
+              {h: "Cooldown", v: function (r) { return Number(r.cooldown) || 0; }, html: function (r) { return r.cooldown == null ? "" : esc(r.cooldown); }}]});
   };
   P.items = function (id) {
     if (id) {
@@ -432,7 +475,10 @@
     }
     A.listPage({title: "Items", rows: A.data.items, lede: "Weapons, armour, remedies, tools, talismans, trade goods and the guide books.",
       facet: {category: function (r) { return r.category; }}, names: {category: "Category"},
-      card: function (r) { return card("items", r, esc(r.category)); }});
+      card: function (r) { return card("items", r, esc(r.category)); },
+      table: [{h: "Item", v: function (r) { return r.name; }, html: nameCell("items")},
+              {h: "Category", v: function (r) { return r.category; }, html: function (r) { return esc(r.category); }},
+              {h: "Bonuses", v: function (r) { return A.bonuses(r.bonuses); }, html: function (r) { return A.bonuses(r.bonuses); }}]});
   };
 
   /* ---------- starts, modes, music, search ---------- */
@@ -716,5 +762,105 @@
     $("breset").onclick = function () { save({}); drawLedger(); fillRecipes(); $("bout").innerHTML = "Ledger cleared."; };
     document.querySelector("[data-copyline]").onclick = function () { copy(this, $("bline").value); };
     fillAreas(); fillRecipes(); pickStation(); update(); drawLedger();
+  };
+})();
+
+/* ---------- the character planner: the creator's own categories and rules, added up ---------- */
+(function () {
+  "use strict";
+  var A = window.App, esc = A.esc;
+  var KEY = "asagiri-planner";
+
+  /* a trait shows when nothing unlocks it or one of its unlockers is picked, and nothing picked excludes it (either way round) */
+  function open(t, picked) {
+    var names = Object.keys(picked).map(function (c) { return picked[c]; });
+    if (t.unlockedBy.length && !t.unlockedBy.some(function (u) { return names.indexOf(u) >= 0; })) return false;
+    return !names.some(function (n) {
+      if (n === t.name) return false;
+      var o = A.byName("traits", n);
+      return t.excludedBy.indexOf(n) >= 0 || (o && o.excludedBy.indexOf(t.name) >= 0);
+    });
+  }
+  function totals(picked) {
+    var C = A.data.creation, out = {attr: {}, skills: {}, res: {}, abilities: [], items: []};
+    C.attributes.forEach(function (a) { out.attr[a] = C.start; });
+    Object.keys(picked).forEach(function (c) {
+      var t = A.byName("traits", picked[c]); if (!t) return;
+      t.attributes.forEach(function (b) { out.attr[b.attribute] = (out.attr[b.attribute] || C.start) + Number(b.modifier || 0); });
+      t.skills.forEach(function (b) { out.skills[b.skill] = (out.skills[b.skill] || 0) + Number(b.modifier || 0); });
+      t.resources.forEach(function (b) { out.res[b.resource] = (out.res[b.resource] || 0) + Number(b.modifier || 0); });
+      t.abilities.forEach(function (a) { if (out.abilities.indexOf(a) < 0) out.abilities.push(a); });
+      t.startingItems.forEach(function (i) { out.items.push((i.quantity > 1 ? i.quantity + " " : "") + (i.item || i)); });
+    });
+    return out;
+  }
+  A.planner = {open: open, totals: totals};   // the gate runs these under node
+
+  A.pages.planner = function () {
+    var cats = A.data.categories, C = A.data.creation;
+    var picked = {};
+    var fromUrl = A.param("pick");
+    if (fromUrl) fromUrl.split("|").forEach(function (n) { var t = A.byName("traits", n); if (t) picked[t.category] = n; });
+    else picked = A.tryStore(KEY) || {};
+    A.h('<div class="crumbs"><a href="./">Home</a> / Character planner</div><h1>Character planner</h1><p class="lede">Every pick the ' +
+      "creator offers, in its order, with the same unlocks and exclusions: choose a Tradition and its Lineages open, and so on. The " +
+      'totals add up what your picks give. Rules: <a href="mechanics/paths-and-ladders/">Paths and Ladders</a>, ' +
+      '<a href="mechanics/how-fighting-works/">How Fighting Works</a>.</p><div class="article"><div id="pcats"></div>' +
+      '<aside class="infobox" id="ptotal"></aside></div>');
+    function draw() {
+      var changed = true, dropped = [];
+      while (changed) {   // a pick whose unlocker went away is dropped, and that can drop others
+        changed = false;
+        Object.keys(picked).forEach(function (c) {
+          var t = A.byName("traits", picked[c]);
+          var rest = {}; Object.keys(picked).forEach(function (k) { if (k !== c) rest[k] = picked[k]; });
+          if (!t || !open(t, rest)) { dropped.push(picked[c]); delete picked[c]; changed = true; }
+        });
+      }
+      A.tryStore(KEY, picked);
+      document.getElementById("pcats").innerHTML = (dropped.length ? '<p class="warn">No longer open, so left out: ' + dropped.map(esc).join(", ") + "</p>" : "") +
+        cats.map(function (c) {
+          var rest = {}; Object.keys(picked).forEach(function (k) { if (k !== c.name) rest[k] = picked[k]; });
+          var opts = c.traits.map(function (n) { return A.byName("traits", n); }).filter(function (t) { return t && open(t, rest); });
+          var cur = picked[c.name] ? A.byName("traits", picked[c.name]) : null;
+          return '<div class="say"><label for="pc-' + c.id + '"><b>' + esc(c.name) + "</b></label> " +
+            '<span class="note">' + (opts.length ? opts.length + " open" : "none open yet") + "</span>" +
+            '<div class="line"><select id="pc-' + c.id + '" data-cat="' + esc(c.name) + '" style="flex:1"' + (opts.length ? "" : " disabled") + ">" +
+            '<option value="">(no pick)</option>' + opts.map(function (t) {
+              return "<option" + (cur && cur.name === t.name ? " selected" : "") + ">" + esc(t.name) + "</option>";
+            }).join("") + "</select></div>" +
+            (cur ? '<div class="prose"><p><a href="' + A.href("traits", cur.id) + '">' + esc(cur.name) + "</a>: " +
+              esc(A.first(cur.info, 220)) + "</p></div>" : "") +
+            '<details><summary class="note">About ' + esc(c.name) + "</summary>" + A.prose(c.info) + "</details></div>";
+        }).join("");
+      var T = totals(picked), warn = [];
+      var attrs = C.attributes.map(function (a) {
+        var v = T.attr[a], shown = Math.min(v, C.max);
+        if (v > C.max) warn.push(a + " would be " + v + ": the creator stops it at " + C.max);
+        if (v <= C.low) warn.push(a + " at " + v + ": " + (C.lowText[a] || "a weakness"));
+        return ["" + esc(a.charAt(0).toUpperCase() + a.slice(1)), "<b>" + shown + "</b>" + (v !== C.start ? ' <span class="note">(' + (v > C.start ? "+" : "") + (v - C.start) + ")</span>" : "")];
+      });
+      var list = function (o) { return Object.keys(o).sort().map(function (k) { return esc(k) + " " + (o[k] > 0 ? "+" : "") + o[k]; }).join(", "); };
+      var url = location.origin + A.root + "planner/?pick=" + encodeURIComponent(Object.keys(picked).map(function (c) { return picked[c]; }).join("|"));
+      document.getElementById("ptotal").innerHTML = '<div class="hd">Your character</div><dl>' + attrs.map(function (r) { return "<dt>" + r[0] + "</dt><dd>" + r[1] + "</dd>"; }).join("") +
+        "<dt>Skills</dt><dd>" + (list(T.skills) || "-") + "</dd><dt>Resources</dt><dd>" + (list(T.res) || "-") + "</dd>" +
+        "<dt>Abilities</dt><dd>" + (T.abilities.map(function (a) { var r = A.byName("abilities", a); return r ? '<a href="' + A.href("abilities", r.id) + '">' + esc(a) + "</a>" : esc(a); }).join(", ") || "-") + "</dd>" +
+        "<dt>Starts with</dt><dd>" + (T.items.map(esc).join(", ") || "-") + "</dd></dl>" +
+        (warn.length ? '<div class="say warn" style="margin:0 12px 12px">' + warn.map(esc).join("<br>") + "</div>" : "") +
+        '<div style="padding:0 12px 12px"><button id="pshare">Copy a link to this build</button> <button id="pclear">Start over</button></div>';
+      document.getElementById("pshare").onclick = function () {
+        var b = this;
+        if (navigator.clipboard) navigator.clipboard.writeText(url).then(function () { b.textContent = "Link copied"; }, function () { b.textContent = url; });
+        else b.textContent = url;
+      };
+      document.getElementById("pclear").onclick = function () { picked = {}; draw(); };
+    }
+    document.getElementById("pcats").addEventListener("change", function (e) {
+      var s = e.target.closest("select[data-cat]"); if (!s) return;
+      if (s.value) picked[s.dataset.cat] = s.value; else delete picked[s.dataset.cat];
+      draw();
+      var again = document.getElementById(s.id); if (again) again.focus();
+    });
+    draw();
   };
 })();

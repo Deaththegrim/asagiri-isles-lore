@@ -23,6 +23,13 @@
   };
   App.param = function (k) { try { return new URLSearchParams(location.search).get(k) || ""; } catch (e) { return ""; } };
   App.go = function (url) { history.pushState(null, "", new URL(url, document.baseURI).href); route(); };
+  /* a trait's bonuses as the world writes them ([{attribute|skill|resource, modifier}]) -> "Body +1, Breathcraft +2" */
+  App.bonuses = function (list) {
+    return (Array.isArray(list) ? list : []).map(function (b) {
+      var name = b.attribute || b.skill || b.resource || b.variable || "", m = Number(b.modifier != null ? b.modifier : b.value);
+      return name ? App.esc(name.charAt(0).toUpperCase() + name.slice(1)) + " " + (m > 0 ? "+" : "") + (isFinite(m) ? m : "") : "";
+    }).filter(Boolean).join(", ");
+  };
   App.img = function (url, alt, cls) {
     return url ? '<img loading="lazy" src="' + App.esc(url) + '" alt="' + App.esc(alt || "") + '"' + (cls ? ' class="' + cls + '"' : "") + ">" : "";
   };
@@ -47,6 +54,7 @@
     {k: "mechanics", d: "books", label: "Mechanics", g: "Play"},
     {k: "say", d: "say", label: "What to say", g: "Play"},
     {k: "bench", label: "Crafting bench", g: "Play"},
+    {k: "planner", label: "Character planner", g: "Play"},
     {k: "abilities", d: "abilities", label: "Abilities", g: "Play"},
     {k: "traits", d: "traits", label: "Traits", g: "Play"},
     {k: "skills", d: "skills", label: "Skills", g: "Play"},
@@ -75,7 +83,14 @@
       var n = s.d && App.data[s.d] ? App.count(s.d) : "";
       html += '<a href="' + s.k + '/" data-k="' + s.k + '">' + s.label + (n ? "<span>" + n + "</span>" : "") + "</a>";
     });
+    html += '<a href="./" id="random">Random page</a>';
     document.getElementById("side").innerHTML = html;
+    document.getElementById("random").addEventListener("click", function (e) {   // any person, place, creature or lore entry
+      e.preventDefault();
+      var pool = App.index.filter(function (x) { return /^(people|places|creatures|lore)$/.test(x.kind); });
+      var x = pool[Math.floor(Math.random() * pool.length)];
+      App.go(App.href(x.kind, x.id));
+    });
   }
   function nav(active) {
     document.querySelectorAll("#side a").forEach(function (a) {
@@ -214,7 +229,7 @@
 
   /* list page helper: filters + a card grid with "show more" */
   App.listPage = function (opt) {
-    var state = {q: "", f: {}, n: 120};
+    var state = {q: "", f: {}, n: 120, view: opt.table && App.param("view") === "table" ? "table" : "cards", sort: 0, dir: 1};
     Object.keys(opt.facet || {}).forEach(function (k) { if (App.param(k)) state.f[k] = App.param(k); });   // only this list's own filters
     function rows() {
       var q = state.q.toLowerCase();
@@ -223,9 +238,26 @@
         return !q || (r.name + " " + (r.info || "")).toLowerCase().indexOf(q) >= 0;
       });
     }
+    /* table view: each column {h: heading, v: row -> sortable value, html: row -> cell}; a heading button sorts */
+    function table(list) {
+      var cols = opt.table, c = cols[state.sort];
+      list = list.slice().sort(function (a, b) {
+        var x = c.v(a), y = c.v(b);
+        return (typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y))) * state.dir;
+      });
+      return '<div class="tablewrap"><table><thead><tr>' + cols.map(function (k, i) {
+        var on = i === state.sort;
+        return '<th aria-sort="' + (on ? (state.dir > 0 ? "ascending" : "descending") : "none") + '"><button type="button" class="sortby" data-col="' + i + '">' +
+          App.esc(k.h) + (on ? (state.dir > 0 ? " ▲" : " ▼") : "") + "</button></th>";
+      }).join("") + "</tr></thead><tbody>" + list.slice(0, state.n).map(function (r) {
+        return "<tr>" + cols.map(function (k) { return "<td>" + k.html(r) + "</td>"; }).join("") + "</tr>";
+      }).join("") + "</tbody></table></div>";
+    }
     function draw() {
       var list = rows();
-      document.getElementById("grid").innerHTML = list.slice(0, state.n).map(opt.card).join("");
+      var grid = document.getElementById("grid");
+      grid.className = state.view === "table" ? "" : "grid" + (opt.wide ? " wide" : "");
+      grid.innerHTML = state.view === "table" ? table(list) : list.slice(0, state.n).map(opt.card).join("");
       document.getElementById("count").textContent = list.length + " of " + opt.rows.length;
       document.getElementById("more").hidden = list.length <= state.n;
     }
@@ -238,13 +270,29 @@
     }).join("");
     App.h('<div class="crumbs"><a href="./">Home</a> / ' + opt.title + "</div><h1>" + opt.title + '</h1><p class="lede">' + opt.lede +
       '</p><div class="filters"><input type="search" id="lf" placeholder="Filter ' + opt.title.toLowerCase() + '..." aria-label="Filter ' + opt.title + '">' +
-      facets + '<span class="count" id="count" aria-live="polite"></span></div><div class="grid' + (opt.wide ? " wide" : "") + '" id="grid"></div>' +
+      facets + (opt.table ? '<button type="button" id="view" aria-pressed="' + (state.view === "table") + '">' + (state.view === "table" ? "Show cards" : "Show as a table") + "</button>" : "") +
+      '<span class="count" id="count" aria-live="polite"></span></div><div class="grid' + (opt.wide ? " wide" : "") + '" id="grid"></div>' +
       '<button class="more" id="more">Show more</button>');
     document.getElementById("lf").addEventListener("input", function (e) { state.q = e.target.value; state.n = 120; draw(); });
     document.querySelectorAll("[data-f]").forEach(function (s) {
       s.addEventListener("change", function () { state.f[s.dataset.f] = s.value; state.n = 120; draw(); });
     });
     document.getElementById("more").addEventListener("click", function () { state.n += 240; draw(); });
+    if (opt.table) {
+      document.getElementById("view").addEventListener("click", function () {
+        state.view = state.view === "table" ? "cards" : "table";
+        this.textContent = state.view === "table" ? "Show cards" : "Show as a table";
+        this.setAttribute("aria-pressed", state.view === "table");
+        history.replaceState(null, "", location.pathname + (state.view === "table" ? "?view=table" : ""));
+        draw();
+      });
+      document.getElementById("grid").addEventListener("click", function (e) {
+        var b = e.target.closest(".sortby"); if (!b) return;
+        var i = Number(b.dataset.col);
+        state.dir = state.sort === i ? -state.dir : 1; state.sort = i; draw();
+        var again = document.querySelector('.sortby[data-col="' + i + '"]'); if (again) again.focus();
+      });
+    }
     draw();
   };
   App.infobox = function (title, img, rows) {
@@ -257,6 +305,21 @@
     var list = App.data[dkey];
     for (var i = 0; i < list.length; i++) if (list[i].name === name) return list[i];
     return null;
+  };
+  /* "Mentioned on": every entry whose text names this one as a whole name (a wiki's what-links-here) */
+  App.mentions = function (name, selfKind, selfId) {
+    if (!name || name.length < 4) return [];
+    var re = new RegExp("(^|[^\\w'])" + name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "(?![\\w])");
+    var out = [];
+    ["npcs", "locations", "factions", "creatures", "lore", "books", "items", "starts"].forEach(function (d) {
+      var kind = KIND[d], seen = {};
+      App.data[d].forEach(function (r) {
+        if ((kind === selfKind && (r.id === selfId || r.name === name)) || seen[r.name]) return;
+        var text = r.info + " " + (r.areas || []).map(function (a) { return a.text; }).join(" ");
+        if (re.test(text)) { seen[r.name] = 1; out.push({kind: kind, r: r}); }
+      });
+    });
+    return out;
   };
   App.nameLink = function (dkey, name) {
     var r = App.byName(dkey, name);

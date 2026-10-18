@@ -148,6 +148,9 @@ h2.cap { text-transform: capitalize; }
 table { border-collapse: collapse; width: 100%; font-size: 13px; }
 .tablewrap { overflow-x: auto; }
 th, td { text-align: left; padding: var(--space-sm) var(--space-md); border-bottom: 1px solid var(--color-border-subtle); vertical-align: top; }
+.sortby { background: none; border: 0; padding: 0; color: inherit; font: inherit; text-transform: inherit; letter-spacing: inherit; cursor: pointer; }
+.sortby:hover { color: var(--color-text); }
+.sortby:focus-visible { outline: 2px solid var(--color-accent-soft); outline-offset: 2px; }
 th { color: var(--color-text-muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
 
 /* home */
