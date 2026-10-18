@@ -489,8 +489,15 @@
       A.h(crumbs([["Story starts", "starts/"], [s.name]]) + "<h1>" + esc(s.name) + '</h1><div class="prose">' + A.prose(s.info, s.name) + "</div>");
       return;
     }
+    // the facets read the start's own card line ("PARTY · 2-5 players · Saikai Free Port · guided") and danger line
+    var head = function (r) { return r.info.split("\n")[0].split(" · "); };
     A.listPage({title: "Story starts", rows: A.data.starts, wide: true, lede: "Where a story can open, and who is in the first scene.",
-      card: function (r) { return card("starts", r, ""); }});
+      facet: {who: function (r) { return /^PARTY/.test(r.info) ? "Party" : "Solo"; },
+              district: function (r) { var h = head(r); return h.length > 2 ? h[h.length - 2] : ""; },
+              danger: function (r) { var m = r.info.match(/Danger: \S* ?(\w+)/); return m ? m[1] : ""; },
+              era: function (r) { return /After the War/.test(r.info) ? "After the war" : /Otherworld|Training Ground/.test(r.info) ? "Otherworld" : "Before the war"; }},
+      names: {who: "Who", district: "District", danger: "Danger", era: "Era"},
+      card: function (r) { return card("starts", r, esc(head(r).slice(0, 2).join(" · "))); }});
   };
   P.modes = function () {
     A.h(crumbs([["Game modes"]]) + '<h1>Game modes</h1><p class="lede">How the story leans: what to expect more of, what less, and which starts suit it.</p>' +
@@ -499,12 +506,29 @@
   P.music = function () {
     var by = {};
     A.data.music.forEach(function (t) { (by[t.mood] = by[t.mood] || []).push(t); });
-    A.h(crumbs([["Music"]]) + '<h1>Music</h1><p class="lede">The soundtrack the isles play, by the mood of the scene.</p>' +
+    A.h(crumbs([["Music"]]) + '<h1>Music</h1><p class="lede">The soundtrack the isles play, by the mood of the scene.</p><div id="music">' +
       Object.keys(by).sort().map(function (m) {
-        return "<h2>" + esc(m.replace(/_/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2")) + '</h2><div class="grid wide">' + by[m].map(function (t) {
+        return "<h2>" + esc(m.replace(/_/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2")) + '</h2><p><button type="button" class="playall">Play all ' +
+          by[m].length + '</button></p><div class="grid wide">' + by[m].map(function (t) {
           return '<div class="say"><div class="t">' + esc(t.title) + '</div><audio controls preload="none" aria-label="' + esc(t.title) + '" src="' + esc(t.url) + '"></audio></div>';
         }).join("") + "</div>";
-      }).join(""));
+      }).join("") + "</div>");
+    // one track at a time; "Play all" runs a mood's tracks in order, each one starting when the last ends
+    var box = document.getElementById("music"), queue = null;
+    var tracksAfter = function (btn) { return [].slice.call(btn.closest("p").nextElementSibling.querySelectorAll("audio")); };
+    box.addEventListener("play", function (e) {
+      box.querySelectorAll("audio").forEach(function (a) { if (a !== e.target) a.pause(); });
+      if (queue && queue.indexOf(e.target) < 0) queue = null;   // a track started by hand ends the run
+    }, true);
+    box.addEventListener("ended", function (e) {
+      if (!queue) return;
+      var next = queue[queue.indexOf(e.target) + 1];
+      if (next) next.play(); else queue = null;
+    }, true);
+    box.addEventListener("click", function (e) {
+      var b = e.target.closest(".playall"); if (!b) return;
+      queue = tracksAfter(b); queue[0].currentTime = 0; queue[0].play();
+    });
   };
   /* results grouped by kind, best kinds first (people and places), each group's best matches first */
   P.search = function () {
