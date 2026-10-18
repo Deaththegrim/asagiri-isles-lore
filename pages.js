@@ -5,7 +5,7 @@
   var TIERS = ["weak", "average", "strong", "elite", "boss", "mythic"];
 
   function crumbs(parts) {
-    return '<div class="crumbs"><a href="#/">Home</a>' + parts.map(function (p) {
+    return '<div class="crumbs"><a href="./">Home</a>' + parts.map(function (p) {
       return " / " + (p[1] ? '<a href="' + p[1] + '">' + p[0] + "</a>" : esc(p[0]));
     }).join("") + "</div>";
   }
@@ -28,7 +28,7 @@
     navigator.clipboard.writeText(text).then(function () { done("Copied"); }, function () { done("Select and copy"); });
   }
   function districtLink(d) {
-    return '<a href="#/districts/' + d.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") + '">' + esc(d) + "</a>";
+    return '<a href="districts/' + d.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") + '/">' + esc(d) + "</a>";
   }
   function levels(lv) { return lv && lv.length ? lv.join("-") : ""; }
   function regionOf(name) { return A.byName("regions", name); }
@@ -52,8 +52,8 @@
     var pick = d.npcs.filter(function (n) { return n.img; });
     var feat = pick.length ? pick[Math.floor(Math.random() * pick.length)] : null;
     A.h("<h1>The Asagiri Isles</h1>" + (isles ? '<div class="prose">' + A.prose(isles.info.replace(/^\[[^\]]*\]\s*/, "")) + "</div>" : "") +
-      '<div class="tiles">' + tiles.map(function (t) { return '<a class="tile" href="#/' + t[0] + '"><b>' + t[1] + "</b><span>" + t[2] + "</span></a>"; }).join("") +
-      "</div>" + (isles && isles.map ? '<h2>The map</h2><a class="hero" href="#/map/' + isles.id + '">' + A.img(isles.map, "The Asagiri Isles map") + "</a>" : "") +
+      '<div class="tiles">' + tiles.map(function (t) { return '<a class="tile" href="' + t[0] + '/"><b>' + t[1] + "</b><span>" + t[2] + "</span></a>"; }).join("") +
+      "</div>" + (isles && isles.map ? '<h2>The map</h2><a class="hero" href="map/' + isles.id + '/">' + A.img(isles.map, "The Asagiri Isles map") + "</a>" : "") +
       (feat ? "<h2>Someone you might meet</h2><div class='grid'>" + card("people", feat, esc(feat.type)) + "</div>" : "") +
       '<p class="note" style="margin-top:32px">Everything here is what a player can learn at the table: no one\'s secrets, no hidden places. ' +
       "Built from the world file; data " + esc(d.sha || "") + ".</p>");
@@ -78,7 +78,7 @@
     var place = A.byName("locations", n.location);
     var versions = A.data.npcs.filter(function (o) { return o.name === n.name; });
     var vlabel = function (o) { var pl = A.byName("locations", o.location); return (pl ? era(pl.region) : "Elsewhere") + (o.epithet ? ": " + o.epithet : ""); };
-    A.h(crumbs([["People", "#/people"], [n.name]]) + "<h1>" + esc(n.name) + "</h1>" + (n.epithet ? '<p class="lede">' + esc(n.epithet) + "</p>" : "") +
+    A.h(crumbs([["People", "people/"], [n.name]]) + "<h1>" + esc(n.name) + "</h1>" + (n.epithet ? '<p class="lede">' + esc(n.epithet) + "</p>" : "") +
       (versions.length > 1 ? '<nav class="tabs" aria-label="Eras">' + versions.map(function (o) {
         return '<a href="' + A.href("people", o.id) + '"' + (o.id === n.id ? ' class="on" aria-current="page"' : "") + ">" + esc(vlabel(o)) + "</a>";
       }).join("") + "</nav>" : "") + '<div class="article"><div class="prose">' +
@@ -92,7 +92,7 @@
       A.infobox(n.name, n.img || (versions.filter(function (o) { return o.img; })[0] || {}).img, [["Type", esc(n.type)], ["Gender", esc(n.gender)], ["Tier", esc(n.tier)], ["Level", n.level],
         ["Faction", n.faction ? A.nameLink("factions", n.faction) : ""], ["Home", n.location ? placeLink(n.location, n.area) : ""],
         ["District", place && place.district ? districtLink(place.district) : ""], ["Era", place ? era(place.region) : ""],
-        ["Map", place && regionOf(place.region) ? '<a href="#/map/' + regionOf(place.region).id + "?pin=" + place.id + '">Show on map</a>' : ""]]) +
+        ["Map", place && regionOf(place.region) ? '<a href="map/' + regionOf(place.region).id + "/?pin=" + place.id + '">Show on map</a>' : ""]]) +
       "</div>");
   }
 
@@ -120,10 +120,10 @@
     if (!p) return missing("Places");
     var people = A.data.npcs.filter(function (n) { return n.location === p.name; });
     var reg = regionOf(p.region), here = sayHere(p.name);
-    A.h(crumbs([["Places", "#/places"], [p.name]]) + "<h1>" + esc(p.name) + '</h1><div class="article"><div class="prose">' +
+    A.h(crumbs([["Places", "places/"], [p.name]]) + "<h1>" + esc(p.name) + '</h1><div class="article"><div class="prose">' +
       A.prose(p.info.replace(/^\[[^\]]*\]\s*/, ""), p.name) +
       (here.length ? "<h2>What you can do here</h2><ul>" + here.map(function (h) {
-        return '<li><a href="#/say/' + h.f.key + '">' + esc(h.f.label) + "</a>" + (h.t.examples[0] ? ": <code>" + esc(h.t.examples[0]) + "</code>" : "") + "</li>";
+        return '<li><a href="say/' + h.f.key + '/">' + esc(h.f.label) + "</a>" + (h.t.examples[0] ? ": <code>" + esc(h.t.examples[0]) + "</code>" : "") + "</li>";
       }).join("") + "</ul>" : "") +
       (p.areas.length ? "<h2>Areas</h2><div class='gallery'>" + p.areas.map(function (a) {
         return "<figure>" + (a.img ? A.img(a.img, a.name) : '<div class="noimg" role="img" aria-label="No picture yet"></div>') + "<figcaption><b>" + esc(a.name) + "</b>" + A.link(esc(a.text.split("\n")[0]), p.name) + "</figcaption></figure>";
@@ -131,15 +131,14 @@
       (people.length ? "<h2>People here</h2><div class='grid'>" + people.map(function (n) { return card("people", n, esc(n.type)); }).join("") + "</div>" : "") +
       "</div>" + A.infobox(p.name, p.img, [["District", p.district ? districtLink(p.district) : ""], ["Region", esc(p.region)], ["Era", era(p.region)],
         ["Kind", esc(p.kind)], ["Levels", levels(p.levels)], ["Factions", p.factions.map(function (f) { return A.nameLink("factions", f); }).join(" · ")],
-        ["Map", reg && reg.map ? '<a href="#/map/' + reg.id + "?pin=" + p.id + '">Show on map</a>' : ""]]) + "</div>");
+        ["Map", reg && reg.map ? '<a href="map/' + reg.id + "/?pin=" + p.id + '">Show on map</a>' : ""]]) + "</div>");
   }
 
   /* ---------- map ---------- */
   P.map = function (id) {
     var regs = A.data.regions.filter(function (r) { return r.map && A.data.locations.some(function (l) { return l.region === r.name; }); });
     var reg = regs.filter(function (r) { return r.id === id; })[0] || regs.filter(function (r) { return r.name === "The Asagiri Isles"; })[0] || regs[0];
-    var pinId = (location.hash.split("pin=")[1] || "").split("&")[0];
-    var distPick = decodeURIComponent((location.hash.split("district=")[1] || "").split("&")[0]);
+    var pinId = A.param("pin"), distPick = A.param("district");
     var places = A.data.locations.filter(function (l) { return l.region === reg.name; });
     var dists = {}; places.forEach(function (p) { if (p.district) dists[p.district] = 1; });
     var main = ["The Asagiri Isles", "The Asagiri Isles, After the War", "The Otherworld"];
@@ -163,9 +162,54 @@
       '<button id="zout" aria-label="Zoom out">-</button><button id="zfit">Fit</button></div></div>');
     var map = document.getElementById("map"), stage = document.getElementById("stage"), pop = document.getElementById("pop");
     var v = {s: 1, x: 0, y: 0};
+    var labelsOn = false, rank = {complex: 0, wilderness: 1, simple: 2};
+    // the labels that fit: towns first, then wilds, then the rest, shortest names first; a label that would overlap one already
+    // placed (or leave the map) stays hidden until the zoom makes room (the screen size of a label never changes with zoom)
+    var order = places.slice().sort(function (a, b) {
+      return (rank[a.kind] === undefined ? 3 : rank[a.kind]) - (rank[b.kind] === undefined ? 3 : rank[b.kind]) || a.name.length - b.name.length;
+    });
+    var sizes = null;   // each label's real size on screen, measured once (a label's screen size never changes with zoom)
+    function measure() {
+      sizes = {};
+      stage.querySelectorAll(".pin .lbl").forEach(function (l) {
+        l.hidden = false;
+        var b = l.getBoundingClientRect();
+        sizes[l.parentNode.dataset.id] = [b.width, b.height];
+        l.hidden = true;
+      });
+    }
+    function placeLabels() {
+      if (labelsOn && !sizes) measure();
+      var r = map.getBoundingClientRect(), dist = document.getElementById("mdist").value;
+      var at = function (p) { return [v.x + p.fx * 1000 * v.s, v.y + p.fy * 1000 * v.s]; };
+      // obstacles: every pin (a label never covers another place's dot) and the zoom buttons
+      var pins = places.map(function (p) { var c = at(p); return {id: p.id, box: [c[0] - 9, c[1] - 9, c[0] + 9, c[1] + 9]}; });
+      var z = document.querySelector(".zoom").getBoundingClientRect();
+      var boxes = [[z.left - r.left - 6, z.top - r.top - 6, z.right - r.left + 6, z.bottom - r.top + 6]];
+      var hit = function (box, own) {
+        return box[0] < 0 || box[2] > r.width || box[1] < 0 || box[3] > r.height ||
+          boxes.some(function (o) { return box[0] < o[2] && box[2] > o[0] && box[1] < o[3] && box[3] > o[1]; }) ||
+          pins.some(function (q) { var o = q.box; return q.id !== own && box[0] < o[2] && box[2] > o[0] && box[1] < o[3] && box[3] > o[1]; });
+      };
+      order.forEach(function (p) {
+        var lbl = stage.querySelector('.pin[data-id="' + p.id + '"] .lbl');
+        if (!lbl) return;
+        var show = labelsOn && !(dist && p.district !== dist), left = false;
+        if (show) {
+          var c = at(p), size = sizes[p.id] || [p.name.length * 8 + 20, 24], w = size[0] + 6, h = size[1] + 4;
+          var right = [c[0] + 9, c[1] - h / 2, c[0] + 9 + w, c[1] + h / 2], leftBox = [c[0] - 9 - w, c[1] - h / 2, c[0] - 9, c[1] + h / 2];
+          if (!hit(right, p.id)) boxes.push(right);
+          else if (!hit(leftBox, p.id)) { boxes.push(leftBox); left = true; }   // the right is taken: try the left of the dot
+          else show = false;
+        }
+        lbl.hidden = !show;
+        lbl.classList.toggle("left", left);
+      });
+    }
     function apply() {
       stage.style.transform = "translate(" + v.x + "px," + v.y + "px) scale(" + v.s + ")";
       stage.querySelectorAll(".pin").forEach(function (b) { b.style.transform = "translate(-50%, -50%) scale(" + (1 / v.s) + ")"; });
+      if (labelsOn) { cancelAnimationFrame(apply.raf); apply.raf = requestAnimationFrame(placeLabels); }
     }
     function fit() {
       var r = map.getBoundingClientRect();
@@ -234,17 +278,16 @@
     document.getElementById("zin").onclick = function () { zoom(1.4); };
     document.getElementById("zout").onclick = function () { zoom(1 / 1.4); };
     document.getElementById("zfit").onclick = fit;
-    document.getElementById("mreg").onchange = function () { location.hash = "#/map/" + this.value; };
+    document.getElementById("mreg").onchange = function () { A.go("map/" + this.value + "/"); };
     document.getElementById("mdist").onchange = function () {
       var d = this.value;
       stage.querySelectorAll(".pin").forEach(function (b) {
         var p = places.filter(function (x) { return x.id === b.dataset.id; })[0];
         b.classList.toggle("dim", !!d && p.district !== d);
       });
+      placeLabels();
     };
-    document.getElementById("mlbl").onchange = function () {
-      var on = this.checked; stage.querySelectorAll(".lbl").forEach(function (l) { l.hidden = !on; });
-    };
+    document.getElementById("mlbl").onchange = function () { labelsOn = this.checked; placeLabels(); };
     document.getElementById("mfind").onchange = function () {
       var p = A.byName("locations", this.value);
       if (p && p.region === reg.name) { keyed = true; lastFocus = this; focus(p); }
@@ -264,9 +307,9 @@
       var seats = A.data.locations.filter(function (l) { return l.factions.indexOf(f.name) >= 0; });
       var jobs = A.data.say.filter(function (s) { return s.key === "fac_job"; })[0];
       var job = jobs && jobs.triggers.filter(function (t) { return t.key.indexOf(f.id.replace(/-/g, "_")) >= 0; })[0];
-      A.h(crumbs([["Factions", "#/factions"], [f.name]]) + "<h1>" + esc(f.name) + '</h1><div class="article"><div class="prose">' +
+      A.h(crumbs([["Factions", "factions/"], [f.name]]) + "<h1>" + esc(f.name) + '</h1><div class="article"><div class="prose">' +
         A.prose(f.info, f.name) + (job ? '<h2>Work and rank</h2><p>Sworn members ask for work at the seat' + (job.where.length ? " (" + esc(job.where.join(", ").replace(/^location: /, "")) + ")" : "") +
-        ': <code>' + esc(job.examples[0]) + '</code>. Ranks and promotion: <a href="#/mechanics/oaths-and-ranks">Oaths and Ranks</a>.</p>' : "") +
+        ': <code>' + esc(job.examples[0]) + '</code>. Ranks and promotion: <a href="mechanics/oaths-and-ranks/">Oaths and Ranks</a>.</p>' : "") +
         (members.length ? "<h2>Members</h2><div class='grid'>" + members.map(function (n) { return card("people", n, esc(n.type)); }).join("") + "</div>" : "") +
         "</div>" + A.infobox(f.name, null, [["Kind", esc(f.type)], ["Members", members.length || ""],
           ["Holds", seats.slice(0, 12).map(function (l) { return placeLink(l.name); }).join(" · ")]]) + "</div>");
@@ -284,7 +327,7 @@
       if (!c) return missing("Creatures");
       var met = uniq(A.data.npcs.filter(function (n) { return n.type === c.name; }));
       var tags = function (l, cls) { return l.map(function (x) { return '<span class="tag ' + cls + '">' + esc(x) + "</span>"; }).join(""); };
-      A.h(crumbs([["Creatures", "#/creatures"], [c.name]]) + "<h1>" + esc(c.name) + '</h1><div class="article"><div class="prose">' +
+      A.h(crumbs([["Creatures", "creatures/"], [c.name]]) + "<h1>" + esc(c.name) + '</h1><div class="article"><div class="prose">' +
         A.prose(c.info, c.name) + (met.length ? "<h2>Known " + esc(c.name) + "</h2><div class='grid'>" + met.map(function (n) {
           return card("people", n, n.level ? "level " + n.level : "");
         }).join("") + "</div>" : "") + "</div>" +
@@ -300,7 +343,7 @@
     if (id) {
       var l = find("lore", id);
       if (!l) return missing("Lore");
-      A.h(crumbs([["Lore", "#/lore"], [l.name]]) + "<h1>" + esc(l.name) + '</h1><div class="prose">' + A.prose(l.info, l.name) + "</div>");
+      A.h(crumbs([["Lore", "lore/"], [l.name]]) + "<h1>" + esc(l.name) + '</h1><div class="prose">' + A.prose(l.info, l.name) + "</div>");
       return;
     }
     A.listPage({title: "Lore", rows: A.data.lore, wide: true, lede: "History, powers, society, places and the folk tales the isles tell.",
@@ -320,17 +363,17 @@
       if (!b) return missing("Mechanics");
       var acts = bookSay()[b.name] || [];
       var bench = b.name === "The Craftsman's Primer" || b.name === "The Isles Recipe Book";
-      A.h(crumbs([["Mechanics", "#/mechanics"], [b.name]]) + "<h1>" + esc(b.name) + '</h1><div class="prose">' + A.prose(b.info, b.name) +
-        (acts.length || bench ? "<h2>What to say</h2><ul>" + (bench ? '<li><a href="#/bench">The crafting bench</a>: build the exact line and see what the forge says</li>' : "") +
-          acts.map(function (f) { return '<li><a href="#/say/' + f.key + '">' + esc(f.label) + "</a></li>"; }).join("") + "</ul>" : "") +
+      A.h(crumbs([["Mechanics", "mechanics/"], [b.name]]) + "<h1>" + esc(b.name) + '</h1><div class="prose">' + A.prose(b.info, b.name) +
+        (acts.length || bench ? "<h2>What to say</h2><ul>" + (bench ? '<li><a href="bench/">The crafting bench</a>: build the exact line and see what the forge says</li>' : "") +
+          acts.map(function (f) { return '<li><a href="say/' + f.key + '/">' + esc(f.label) + "</a></li>"; }).join("") + "</ul>" : "") +
         '<p class="note">Every new character carries this book in the world.</p></div>');
       return;
     }
     A.h(crumbs([["Mechanics"]]) + '<h1>Mechanics</h1><p class="lede">How the isles work, as the guide books every new character carries explain it. ' +
       'Each book links to the lines that set its system off.</p><div class="grid wide">' +
       A.data.books.map(function (b) { return card("mechanics", b, (bookSay()[b.name] || []).length ? (bookSay()[b.name].length + " typed actions") : ""); }).join("") +
-      '</div><h2>Tables</h2><ul><li><a href="#/skills">Skills</a>: what each art covers and how hard things are</li><li><a href="#/traits">Traits</a>: every creation pick and what it gives</li>' +
-      '<li><a href="#/abilities">Abilities</a>: requirements, power and cooldown</li><li><a href="#/items">Items</a>: bonuses by item</li></ul>');
+      '</div><h2>Tables</h2><ul><li><a href="skills/">Skills</a>: what each art covers and how hard things are</li><li><a href="traits/">Traits</a>: every creation pick and what it gives</li>' +
+      '<li><a href="abilities/">Abilities</a>: requirements, power and cooldown</li><li><a href="items/">Items</a>: bonuses by item</li></ul>');
   };
 
   /* ---------- skills, traits, abilities, items ---------- */
@@ -352,7 +395,7 @@
       var t = find("traits", id);
       if (!t) return missing("Traits");
       var cat = A.data.categories.filter(function (c) { return c.name === t.category; })[0];
-      A.h(crumbs([["Traits", "#/traits"], [t.name]]) + "<h1>" + esc(t.name) + '</h1><div class="article"><div class="prose">' + A.prose(t.info, t.name) +
+      A.h(crumbs([["Traits", "traits/"], [t.name]]) + "<h1>" + esc(t.name) + '</h1><div class="article"><div class="prose">' + A.prose(t.info, t.name) +
         (cat ? "<h2>" + esc(cat.name) + "</h2>" + A.prose(cat.info.split("\n\n")[0]) : "") + "</div>" +
         A.infobox(t.name, null, [["Category", esc(t.category)], ["Attributes", kv(t.attributes)], ["Skills", kv(t.skills)], ["Resources", kv(t.resources)],
           ["Abilities", t.abilities.map(function (a) { var r = A.byName("abilities", a); return r ? '<a href="' + A.href("abilities", r.id) + '">' + esc(a) + "</a>" : esc(a); }).join(", ")],
@@ -369,7 +412,7 @@
     if (id) {
       var a = find("abilities", id);
       if (!a) return missing("Abilities");
-      A.h(crumbs([["Abilities", "#/abilities"], [a.name]]) + "<h1>" + esc(a.name) + '</h1><div class="article"><div class="prose">' + A.prose(a.info, a.name) + "</div>" +
+      A.h(crumbs([["Abilities", "abilities/"], [a.name]]) + "<h1>" + esc(a.name) + '</h1><div class="article"><div class="prose">' + A.prose(a.info, a.name) + "</div>" +
         A.infobox(a.name, null, [["Needs", needs(a.needs)], ["Power", a.bonus], ["Cooldown", a.cooldown != null ? a.cooldown + " turns" : ""]]) + "</div>");
       return;
     }
@@ -381,7 +424,7 @@
     if (id) {
       var it = find("items", id);
       if (!it) return missing("Items");
-      A.h(crumbs([["Items", "#/items"], [it.name]]) + "<h1>" + esc(it.name) + '</h1><div class="article"><div class="prose">' + A.prose(it.info, it.name) + "</div>" +
+      A.h(crumbs([["Items", "items/"], [it.name]]) + "<h1>" + esc(it.name) + '</h1><div class="article"><div class="prose">' + A.prose(it.info, it.name) + "</div>" +
         A.infobox(it.name, it.img, [["Category", esc(it.category)], ["Bonuses", it.bonuses.map(function (b) {
           return esc(b.variable) + " " + (b.value > 0 ? "+" : "") + esc(b.value);
         }).join(", ")]]) + "</div>");
@@ -397,7 +440,7 @@
     if (id) {
       var s = find("starts", id);
       if (!s) return missing("Story starts");
-      A.h(crumbs([["Story starts", "#/starts"], [s.name]]) + "<h1>" + esc(s.name) + '</h1><div class="prose">' + A.prose(s.info, s.name) + "</div>");
+      A.h(crumbs([["Story starts", "starts/"], [s.name]]) + "<h1>" + esc(s.name) + '</h1><div class="prose">' + A.prose(s.info, s.name) + "</div>");
       return;
     }
     A.listPage({title: "Story starts", rows: A.data.starts, wide: true, lede: "Where a story can open, and who is in the first scene.",
@@ -419,7 +462,7 @@
   };
   /* results grouped by kind, best kinds first (people and places), each group's best matches first */
   P.search = function () {
-    var q = decodeURIComponent((location.hash.split("q=")[1] || "").split("&")[0]);
+    var q = A.param("q");
     var list = A.search(q), groups = {}, order = [];
     list.forEach(function (e) { if (!groups[e.kind]) { groups[e.kind] = []; order.push(e.kind); } groups[e.kind].push(e); });
     var label = {people: "People", places: "Places", factions: "Factions", creatures: "Creatures", lore: "Lore", mechanics: "Guide books",
@@ -456,7 +499,7 @@
           var lv = places.map(function (l) { return l.levels || []; }).reduce(function (a, b) { return a.concat(b); }, []);
           var band = lv.length ? Math.min.apply(null, lv) + "-" + Math.max.apply(null, lv) : "";
           var lr = lore(n);
-          return '<a class="card" href="#/districts/' + sl(n) + '"><div class="pic land">' + A.img(hub.img, n) + '</div><div class="body"><div class="t">' +
+          return '<a class="card" href="districts/' + sl(n) + '/"><div class="pic land">' + A.img(hub.img, n) + '</div><div class="body"><div class="t">' +
             esc(n) + '</div><div class="s">' + places.length + " places" + (band ? " · level " + band : "") + '</div><div class="x">' +
             esc(lr ? A.first(lr.info.replace(/^.*? is a district of the Asagiri Isles\. /, ""), 140) : "") + "</div></div></a>";
         }).join("") + "</div>");
@@ -470,16 +513,16 @@
     var people = uniq(A.data.npcs.filter(function (n) { return here[n.location]; }));
     var facs = {}; all[name].forEach(function (l) { l.factions.forEach(function (f) { facs[f] = 1; }); });
     var lr = lore(name);
-    A.h(crumbs([["Districts", "#/districts"], [name]]) + "<h1>" + esc(name) + '</h1><div class="prose">' + (lr ? A.prose(lr.info, name) : "") +
-      "</div><p>" + (isles ? '<a href="#/map/' + isles.id + "?district=" + encodeURIComponent(name) + '">Show it on the map</a> · ' : "") +
-      '<a href="#/people?district=' + encodeURIComponent(name) + '">Everyone here</a></p>' +
+    A.h(crumbs([["Districts", "districts/"], [name]]) + "<h1>" + esc(name) + '</h1><div class="prose">' + (lr ? A.prose(lr.info, name) : "") +
+      "</div><p>" + (isles ? '<a href="map/' + isles.id + "/?district=" + encodeURIComponent(name) + '">Show it on the map</a> · ' : "") +
+      '<a href="people/?district=' + encodeURIComponent(name) + '">Everyone here</a></p>' +
       "<h2>Places before the war</h2><div class='grid'>" + before.map(function (l) { return card("places", l, esc(l.kind) + (levels(l.levels) ? " · lv " + levels(l.levels) : ""), true); }).join("") + "</div>" +
       (after.length ? "<h2>Places after the war</h2><div class='grid'>" + after.map(function (l) { return card("places", l, esc(l.kind) + (levels(l.levels) ? " · lv " + levels(l.levels) : ""), true); }).join("") + "</div>" : "") +
       (Object.keys(facs).length ? "<h2>Factions here</h2><div class='grid wide'>" + Object.keys(facs).sort().map(function (f) {
         var r = A.byName("factions", f); return r ? card("factions", r, esc(r.type)) : "";
       }).join("") + "</div>" : "") +
       (people.length ? "<h2>People</h2><div class='grid'>" + people.slice(0, 48).map(function (n) { return card("people", n, esc(n.type)); }).join("") + "</div>" +
-        (people.length > 48 ? '<p><a href="#/people?district=' + encodeURIComponent(name) + '">All ' + people.length + " people of " + esc(name) + "</a></p>" : "") : ""));
+        (people.length > 48 ? '<p><a href="people/?district=' + encodeURIComponent(name) + '">All ' + people.length + " people of " + esc(name) + "</a></p>" : "") : ""));
   };
 
   /* ---------- what to say ---------- */
@@ -490,11 +533,11 @@
       fams.forEach(function (f) { (by[f.system] = by[f.system] || []).push(f); });
       A.h(crumbs([["What to say"]]) + '<h1>What to say</h1><p class="lede">The lines that set off the isles\' systems. Each one is read off the world\'s own ' +
         "triggers and checked against their word checks, so the words are right; where a line also needs the narrator to agree the moment is real, it says so. " +
-        'Crafting has its own <a href="#/bench">bench</a>.</p>' +
+        'Crafting has its own <a href="bench/">bench</a>.</p>' +
         Object.keys(by).map(function (s) {
           return "<h2>" + esc(s) + "</h2><div class='grid wide'>" + by[s].map(function (f) {
             var t = f.triggers[0];
-            return '<a class="card" href="#/say/' + f.key + '"><div class="body"><div class="t">' + esc(f.label) + '</div><div class="s">' + esc(f.how) +
+            return '<a class="card" href="say/' + f.key + '/"><div class="body"><div class="t">' + esc(f.label) + '</div><div class="s">' + esc(f.how) +
               "</div>" + (t.examples[0] ? '<div class="x"><code>' + esc(t.examples[0]) + "</code></div>" : "") + "</div></a>";
           }).join("") + "</div>";
         }).join(""));
@@ -503,7 +546,7 @@
     var f = fams.filter(function (x) { return x.key === key; })[0];
     if (!f) return missing("What to say");
     var book = f.book && A.byName("books", f.book);
-    A.h(crumbs([["What to say", "#/say"], [f.label]]) + "<h1>" + esc(f.label) + '</h1><p class="lede">' + esc(f.how) +
+    A.h(crumbs([["What to say", "say/"], [f.label]]) + "<h1>" + esc(f.label) + '</h1><p class="lede">' + esc(f.how) +
       (book ? ' Rules: <a href="' + A.href("mechanics", book.id) + '">' + esc(book.name) + "</a>." : "") + "</p>" +
       '<div class="say"><label for="try"><b>Try your own line</b></label><div class="line"><input id="try" style="flex:1" placeholder="Type what your character does..."></div>' +
       '<div id="tryout" class="note" aria-live="polite">Type a line to see which of these it would set off.</div></div>' +
@@ -555,8 +598,8 @@
     var stations = A.data.locations;
     var QUAL = ["Base", "Fine", "Superior", "Master-made", "Named"];
     A.h(crumbs([["Crafting bench"]]) + '<h1>Crafting bench</h1><p class="lede">Build the exact line to type, then run it through the isles\' own crafting ' +
-      'triggers, the same code the game runs, to see what the narrator will be told. Rules: <a href="#/mechanics/the-craftsman-s-primer">The Craftsman\'s Primer</a>, ' +
-      'recipes: <a href="#/mechanics/the-isles-recipe-book">The Isles Recipe Book</a>.</p><div class="cols"><div>' +
+      'triggers, the same code the game runs, to see what the narrator will be told. Rules: <a href="mechanics/the-craftsman-s-primer/">The Craftsman\'s Primer</a>, ' +
+      'recipes: <a href="mechanics/the-isles-recipe-book/">The Isles Recipe Book</a>.</p><div class="cols"><div>' +
       '<div class="form"><label for="bact">I want to</label><select id="bact"><option value="craft">Craft a recipe</option><option value="design">Design a new recipe</option>' +
       '<option value="upgrade">Upgrade something I made</option></select>' +
       '<label for="brec" data-for="craft upgrade">Recipe</label><select id="brec" data-for="craft upgrade"></select>' +

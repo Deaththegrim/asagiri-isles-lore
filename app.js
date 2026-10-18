@@ -9,7 +9,20 @@
     });
   };
   App.h = function (html) { document.getElementById("main").innerHTML = html; };
-  App.href = function (kind, id) { return "#/" + kind + "/" + encodeURIComponent(id); };
+  App.href = function (kind, id) { return kind + "/" + encodeURIComponent(id) + "/"; };
+  /* the site's root path, from <base href> (every page carries one, so a link "people/x/" means the same on every page) */
+  App.root = (function () {
+    try { var u = new URL(document.baseURI); return typeof u.pathname === "string" ? u.pathname.replace(/[^/]*$/, "") : "/"; }
+    catch (e) { return "/"; }
+  })();
+  /* the route: the path under the root, without slashes at the ends */
+  App.path = function () {
+    var p = decodeURIComponent(location.pathname);
+    if (p.indexOf(App.root) === 0) p = p.slice(App.root.length);
+    return p.replace(/index\.html$/, "").replace(/^\/+|\/+$/g, "");
+  };
+  App.param = function (k) { try { return new URLSearchParams(location.search).get(k) || ""; } catch (e) { return ""; } };
+  App.go = function (url) { history.pushState(null, "", new URL(url, document.baseURI).href); route(); };
   App.img = function (url, alt, cls) {
     return url ? '<img loading="lazy" src="' + App.esc(url) + '" alt="' + App.esc(alt || "") + '"' + (cls ? ' class="' + cls + '"' : "") + ">" : "";
   };
@@ -56,11 +69,11 @@
 
   /* the side nav is built once; a route only moves its current mark, so keyboard focus on a nav link survives */
   function buildNav() {
-    var html = '<a href="#/" data-k="">Home</a>', grp = "";
+    var html = '<a href="./" data-k="">Home</a>', grp = "";
     App.SECTIONS.forEach(function (s) {
       if (s.g !== grp) { grp = s.g; html += '<div class="grp">' + grp + "</div>"; }
       var n = s.d && App.data[s.d] ? App.count(s.d) : "";
-      html += '<a href="#/' + s.k + '" data-k="' + s.k + '">' + s.label + (n ? "<span>" + n + "</span>" : "") + "</a>";
+      html += '<a href="' + s.k + '/" data-k="' + s.k + '">' + s.label + (n ? "<span>" + n + "</span>" : "") + "</a>";
     });
     document.getElementById("side").innerHTML = html;
   }
@@ -123,7 +136,7 @@
     function show() {
       var list = App.search(q.value, 12);
       sel = 0;
-      box.innerHTML = list.length ? resultsHtml(list) + '<a role="option" id="optall" aria-selected="false" href="#/search?q=' +
+      box.innerHTML = list.length ? resultsHtml(list) + '<a role="option" id="optall" aria-selected="false" href="search/?q=' +
         encodeURIComponent(q.value) + '"><span>All results for "' + App.esc(q.value) + '"</span></a>' :
         '<div role="option" aria-disabled="true" aria-selected="false" class="note" style="padding:8px 12px">Nothing found</div>';
       open(!!q.value.trim());
@@ -138,7 +151,7 @@
         mark(items);
       } else if (ev.key === "Enter") {
         if (!q.value.trim()) return;
-        location.hash = items[sel] ? items[sel].getAttribute("href") : "#/search?q=" + encodeURIComponent(q.value);
+        App.go(items[sel] ? items[sel].getAttribute("href") : "search/?q=" + encodeURIComponent(q.value));
         open(false);
       } else if (ev.key === "Escape") { open(false); }
     });
@@ -202,11 +215,7 @@
   /* list page helper: filters + a card grid with "show more" */
   App.listPage = function (opt) {
     var state = {q: "", f: {}, n: 120};
-    var hash = location.hash.split("?")[1];
-    if (hash) hash.split("&").forEach(function (kv) {
-      var p = kv.split("=");
-      if (opt.facet && opt.facet[p[0]]) state.f[p[0]] = decodeURIComponent(p[1] || "");   // only this list's own filters
-    });
+    Object.keys(opt.facet || {}).forEach(function (k) { if (App.param(k)) state.f[k] = App.param(k); });   // only this list's own filters
     function rows() {
       var q = state.q.toLowerCase();
       return opt.rows.filter(function (r) {
@@ -227,7 +236,7 @@
       return '<select data-f="' + k + '" aria-label="' + (opt.names || {})[k] + '"><option value="">' + (opt.names || {})[k] + ": all</option>" +
         keys.map(function (v) { return '<option' + (state.f[k] === v ? " selected" : "") + ">" + App.esc(v) + "</option>"; }).join("") + "</select>";
     }).join("");
-    App.h('<div class="crumbs"><a href="#/">Home</a> / ' + opt.title + "</div><h1>" + opt.title + '</h1><p class="lede">' + opt.lede +
+    App.h('<div class="crumbs"><a href="./">Home</a> / ' + opt.title + "</div><h1>" + opt.title + '</h1><p class="lede">' + opt.lede +
       '</p><div class="filters"><input type="search" id="lf" placeholder="Filter ' + opt.title.toLowerCase() + '..." aria-label="Filter ' + opt.title + '">' +
       facets + '<span class="count" id="count" aria-live="polite"></span></div><div class="grid' + (opt.wide ? " wide" : "") + '" id="grid"></div>' +
       '<button class="more" id="more">Show more</button>');
@@ -256,8 +265,7 @@
 
   /* ---------- router ---------- */
   function route() {
-    var h = decodeURIComponent(location.hash.replace(/^#\/?/, "")).split("?")[0];
-    var parts = h.split("/");
+    var parts = App.path().split("/");
     var key = parts[0] || "";
     nav(key);
     drawer(false);
@@ -348,7 +356,19 @@
     buildLinker();
     buildNav();
     wireSearch();
-    window.addEventListener("hashchange", route);
+    if (location.hash.indexOf("#/") === 0) {   // an old #/ link: the same page at its real address
+      var old = location.hash.slice(2).split("?");
+      history.replaceState(null, "", App.root + (old[0] ? old[0].replace(/\/?$/, "/") : "") + (old[1] ? "?" + old[1] : ""));
+    }
+    document.addEventListener("click", function (ev) {   // links inside the site route here, without a page load
+      var a = ev.target.closest("a[href]");
+      if (!a || a.target || ev.defaultPrevented || ev.button || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
+      var u = new URL(a.href, document.baseURI);
+      if (u.origin !== location.origin || u.pathname.indexOf(App.root) !== 0 || /\.[a-z0-9]+$/i.test(u.pathname)) return;
+      ev.preventDefault();
+      App.go(u.href);
+    });
+    window.addEventListener("popstate", route);
     route();
   }).catch(function (e) { App.h("<h1>Could not load the lorebook</h1><p class='note'>" + App.esc(e.message) + "</p>"); });
 })();
