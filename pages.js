@@ -77,6 +77,8 @@
     if (!p) return esc(name || "");
     return '<a href="' + A.href("places", p.id) + '">' + esc(name) + "</a>" + (area ? ", " + esc(area) : "");
   }
+  A.ui = {card: card, crumbs: crumbs, find: find, missing: missing, uniq: uniq, placeLink: placeLink, nameCell: nameCell,   // play.js
+          mentioned: mentioned, districtLink: districtLink, districtsAll: districtsAll};
   function era(region) {
     return region === "The Asagiri Isles, After the War" ? "After the war" : region === "The Otherworld" ? "Otherworld" :
       region === "The Asagiri Isles" ? "Before the war" : "Depths and isles";
@@ -378,28 +380,6 @@
   };
 
   /* ---------- factions ---------- */
-  P.factions = function (id) {
-    if (id) {
-      var f = find("factions", id);
-      if (!f) return missing("Factions");
-      var members = uniq(A.data.npcs.filter(function (n) { return n.faction === f.name; }));
-      var seats = A.data.locations.filter(function (l) { return l.factions.indexOf(f.name) >= 0; });
-      var jobs = A.data.say.filter(function (s) { return s.key === "fac_job"; })[0];
-      var job = jobs && jobs.triggers.filter(function (t) { return t.key.indexOf(f.id.replace(/-/g, "_")) >= 0; })[0];
-      A.h(crumbs([["Factions", "factions/"], [f.name]]) + "<h1>" + esc(f.name) + '</h1><div class="article"><div class="prose">' +
-        A.prose(f.info, f.name) + (job ? '<h2>Work and rank</h2><p>Sworn members ask for work at the seat' + (job.where.length ? " (" + esc(job.where.join(", ").replace(/^location: /, "")) + ")" : "") +
-        ': <code>' + esc(job.examples[0]) + '</code>. Ranks and promotion: <a href="mechanics/oaths-and-ranks/">Oaths and Ranks</a>.</p>' : "") +
-        (members.length ? "<h2>Members</h2><div class='grid'>" + members.map(function (n) { return card("people", n, esc(n.type)); }).join("") + "</div>" : "") +
-        "</div>" + A.infobox(f.name, null, [["Kind", esc(f.type)], ["Members", members.length || ""],
-          ["Holds", seats.slice(0, 12).map(function (l) { return placeLink(l.name); }).join(" · ")]]) + "</div>");
-      mentioned(f.name, "factions", f.id);
-      return;
-    }
-    A.listPage({title: "Factions", rows: A.data.factions, wide: true, lede: "The houses, villages, courts and bands you can swear to, work for or cross.",
-      facet: {kind: function (r) { return r.type; }}, names: {kind: "Kind"},
-      card: function (r) { return card("factions", r, esc(r.type)); }});
-  };
-
   /* ---------- creatures ---------- */
   P.creatures = function (id) {
     if (id) {
@@ -524,24 +504,6 @@
               {h: "Power", v: function (r) { return Number(r.bonus) || 0; }, html: function (r) { return r.bonus == null ? "" : esc(r.bonus); }},
               {h: "Cooldown", v: function (r) { return Number(r.cooldown) || 0; }, html: function (r) { return r.cooldown == null ? "" : esc(r.cooldown); }}]});
   };
-  P.items = function (id) {
-    if (id) {
-      var it = find("items", id);
-      if (!it) return missing("Items");
-      A.h(crumbs([["Items", "items/"], [it.name]]) + "<h1>" + esc(it.name) + '</h1><div class="article"><div class="prose">' + A.prose(it.info, it.name) + "</div>" +
-        A.infobox(it.name, it.img, [["Category", esc(it.category)], ["Bonuses", it.bonuses.map(function (b) {
-          return esc(b.variable) + " " + (b.value > 0 ? "+" : "") + esc(b.value);
-        }).join(", ")]]) + "</div>");
-      return;
-    }
-    A.listPage({title: "Items", rows: A.data.items, lede: "Weapons, armour, remedies, tools, talismans, trade goods and the guide books.",
-      facet: {category: function (r) { return r.category; }}, names: {category: "Category"},
-      card: function (r) { return card("items", r, esc(r.category)); },
-      table: [{h: "Item", v: function (r) { return r.name; }, html: nameCell("items")},
-              {h: "Category", v: function (r) { return r.category; }, html: function (r) { return esc(r.category); }},
-              {h: "Bonuses", v: function (r) { return A.bonuses(r.bonuses); }, html: function (r) { return A.bonuses(r.bonuses); }}]});
-  };
-
   /* ---------- starts, modes, music, search ---------- */
   P.starts = function (id) {
     if (id) {

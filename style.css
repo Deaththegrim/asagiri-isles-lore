@@ -241,6 +241,7 @@ audio { width: 100%; height: 36px; }
 .webnamed, .keynamed { stroke: var(--color-warning); background: var(--color-warning); }
 .webfac, .keyfac { stroke: var(--color-info); background: var(--color-info); stroke-dasharray: 6 4; }
 .webhome, .keyhome { stroke: var(--color-border-strong); background: var(--color-border-strong); stroke-dasharray: 2 4; }
+.dchips.inline { display: inline-flex; vertical-align: middle; margin-right: var(--space-sm); }
 .webring { fill: var(--color-surface-elev); stroke: var(--color-border-strong); stroke-width: 2; }
 .webnone { fill: var(--color-surface-overlay); }
 .weblbl { fill: var(--color-text); font-size: 13px; }

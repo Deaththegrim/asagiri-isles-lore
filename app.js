@@ -51,7 +51,9 @@
     {k: "factions", d: "factions", label: "Factions", g: "World"},
     {k: "creatures", d: "creatures", label: "Creatures", g: "World"},
     {k: "lore", d: "lore", label: "Lore", g: "World"},
+    {k: "guide", label: "New player guide", g: "Play"},
     {k: "mechanics", d: "books", label: "Mechanics", g: "Play"},
+    {k: "quests", d: "quests", label: "Quests", g: "Play"},
     {k: "say", d: "say", label: "What to say", g: "Play"},
     {k: "bench", label: "Crafting bench", g: "Play"},
     {k: "planner", label: "Character planner", g: "Play"},
@@ -64,10 +66,10 @@
     {k: "music", d: "music", label: "Music", g: "Extras"}
   ];
   var KIND = {npcs: "people", locations: "places", factions: "factions", creatures: "creatures", lore: "lore", books: "mechanics",
-              abilities: "abilities", traits: "traits", skills: "skills", items: "items", starts: "starts", regions: "map"};
+              abilities: "abilities", traits: "traits", skills: "skills", items: "items", starts: "starts", regions: "map", quests: "quests"};
   App.KIND = KIND;
   var LABEL = {people: "Person", places: "Place", factions: "Faction", creatures: "Creature", lore: "Lore", mechanics: "Guide",
-               abilities: "Ability", traits: "Trait", skills: "Skill", items: "Item", starts: "Story start", map: "Map"};
+               abilities: "Ability", traits: "Trait", skills: "Skill", items: "Item", starts: "Story start", map: "Map", quests: "Quest"};
 
   /* how many entries a section lists: people once each, however many eras they have */
   App.count = function (d) {
