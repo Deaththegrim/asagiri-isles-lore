@@ -67,7 +67,7 @@
         '</div><p>Covered: you have not chosen to see what follows the war.</p></div>';
     }
     var text = A.first(r.info, 220);
-    return (r.img ? '<div class="pv-pic' + (kind === "people" ? " tall" : "") + '">' + A.img(r.img, "").replace('loading="lazy" ', "") + "</div>" : "") +
+    return (r.img ? '<div class="pv-pic' + (kind === "people" ? " tall" : "") + '">' + A.img(r.img, "", "", true).replace('loading="lazy" ', "") + "</div>" : "") +
       '<div class="pv-body"><div class="pv-k">' +
       esc(label) + (sub && sub !== label ? " · " + esc(sub) : "") + '</div><div class="pv-t">' + esc(r.name) + "</div>" + (text ? "<p>" + esc(text) + "</p>" : "") + "</div>";
   };

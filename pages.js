@@ -35,7 +35,7 @@
     var d = districtOf(kind, r), been = kind === "places" && A.been && A.been.has(r.id);
     return '<a class="card' + (d ? " dc" : "") + (been ? " visited" : "") + '" href="' + A.href(kind, r.id) + '"' + accent(d) +
       (d || been ? ' title="' + esc((d || "") + (been ? (d ? " · " : "") + "been there" : "")) + '"' : "") + ">" + (r.img !== undefined ? '<div class="pic' + (land ? " land" : "") + '">' +
-      A.img(r.img, r.name) + "</div>" : "") + '<div class="body"><div class="t">' + esc(r.name) + "</div>" +
+      A.img(r.img, r.name, "", true) + "</div>" : "") + '<div class="body"><div class="t">' + esc(r.name) + "</div>" +
       (sub ? '<div class="s">' + sub + "</div>" : "") + (land || r.img === undefined ? '<div class="x">' + esc(A.first(r.info)) + "</div>" : "") +
       "</div></a>";
   }
@@ -196,7 +196,7 @@
         return '<li><a href="say/' + h.f.key + '/">' + esc(h.f.label) + "</a>" + (h.t.examples[0] ? ": <code>" + esc(h.t.examples[0]) + "</code>" : "") + "</li>";
       }).join("") + "</ul>" : "") +
       (p.areas.length ? "<h2>Areas</h2><div class='gallery'>" + p.areas.map(function (a) {
-        return "<figure>" + (a.img ? A.img(a.img, a.name) : '<div class="noimg" role="img" aria-label="No picture yet"></div>') + "<figcaption><b>" + esc(a.name) + "</b>" + A.link(esc(a.text.split("\n")[0]), p.name) + "</figcaption></figure>";
+        return "<figure>" + (a.img ? A.img(a.img, a.name, "", true) : '<div class="noimg" role="img" aria-label="No picture yet"></div>') + "<figcaption><b>" + esc(a.name) + "</b>" + A.link(esc(a.text.split("\n")[0]), p.name) + "</figcaption></figure>";
       }).join("") + "</div>" : "") +
       (people.length ? "<h2>People here</h2>" + byArea(people).map(function (g) {
         return (g.area ? "<h3>" + esc(g.area) + "</h3>" : "") + "<div class='grid'>" + g.rows.map(function (n) { return card("people", n, esc(n.type)); }).join("") + "</div>";
@@ -304,7 +304,7 @@
       stage.querySelectorAll(".pin").forEach(function (b) { b.classList.toggle("on", b.dataset.id === p.id); });
       var people = A.data.npcs.filter(function (n) { return n.location === p.name; });
       pop.hidden = false;
-      pop.innerHTML = (p.img ? A.img(p.img, p.name) : "") + '<div class="body"><h3><a href="' + A.href("places", p.id) + '">' + esc(p.name) +
+      pop.innerHTML = (p.img ? A.img(p.img, p.name, "", true) : "") + '<div class="body"><h3><a href="' + A.href("places", p.id) + '">' + esc(p.name) +
         "</a></h3><div class='note'>" + esc(p.district || "") + (levels(p.levels) ? " · level " + levels(p.levels) : "") + "</div><p>" +
         esc(A.first(p.info, 260)) + "</p>" + (people.length ? "<div class='note'>" + people.length + " people here</div>" : "") +
         '<p class="popbtns">' + A.been.button(p) + '<button id="pclose">Close</button></p></div>';
@@ -620,7 +620,7 @@
           var lv = places.map(function (l) { return l.levels || []; }).reduce(function (a, b) { return a.concat(b); }, []);
           var band = lv.length ? Math.min.apply(null, lv) + "-" + Math.max.apply(null, lv) : "";
           var lr = lore(n);
-          return '<a class="card dc" href="districts/' + sl(n) + '/"' + accent(n) + '><div class="pic land">' + A.img(hub.img, n) + '</div><div class="body"><div class="t">' +
+          return '<a class="card dc" href="districts/' + sl(n) + '/"' + accent(n) + '><div class="pic land">' + A.img(hub.img, n, "", true) + '</div><div class="body"><div class="t">' +
             esc(n) + '</div><div class="s">' + places.length + " places" + (band ? " · level " + band : "") + (marked ? " · been to " + (prog[n] || [0])[0] : "") + '</div><div class="x">' +
             esc(lr ? A.first(lr.info.replace(/^.*? is a district of the Asagiri Isles\. /, ""), 140) : "") + "</div></div></a>";
         }).join("") + "</div>");

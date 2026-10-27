@@ -27,7 +27,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 }
 nav.side a.on:focus-visible, .tabs a.on:focus-visible, button.primary:focus-visible { outline-color: var(--color-text); }
 .results a:focus-visible { outline-offset: -2px; }
-img { max-width: 100%; }
+img { max-width: 100%; height: auto; }   /* an art picture carries its folder's size: its box holds before it loads */
 [hidden] { display: none !important; }
 main:focus, h2[tabindex="-1"]:focus { outline: none; }   /* focus moved there by script, for screen readers: no ring */
 h1, h2, h3 { line-height: 1.2; margin: 0 0 var(--space-md); }
@@ -49,7 +49,7 @@ p code, li code { padding: var(--space-2xs) var(--space-xs); border-radius: var(
 .search { position: relative; flex: 1; max-width: 560px; }
 .search input { width: 100%; }
 .play { margin-left: auto; white-space: nowrap; padding: var(--space-xs) var(--space-md); border-radius: var(--radius-md);
-  background: var(--color-accent); color: var(--color-text-on-accent); font-weight: 600; }
+  background: var(--color-selected-bg); color: var(--color-text-on-accent); font-weight: 600; }   /* white on it: 6.7:1 (the lighter accent was 3.67) */
 .play:hover { background: var(--color-accent-hover); }
 .results { position: absolute; left: 0; right: 0; top: calc(100% + var(--space-xs)); max-height: 70vh; overflow: auto;
   background: var(--color-surface-elev); border: 1px solid var(--color-border-strong); border-radius: var(--radius-md);

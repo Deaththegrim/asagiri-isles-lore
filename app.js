@@ -30,9 +30,29 @@
       return name ? App.esc(name.charAt(0).toUpperCase() + name.slice(1)) + " " + (m > 0 ? "+" : "") + (isFinite(m) ? m : "") : "";
     }).filter(Boolean).join(", ");
   };
-  App.img = function (url, alt, cls) {
-    return url ? '<img loading="lazy" src="' + App.esc(url) + '" alt="' + App.esc(alt || "") + '"' + (cls ? ' class="' + cls + '"' : "") + ">" : "";
+  /* the world's art (asagiri_lore_assets.ART_*, carried in the shell): each folder's picture size, so a picture's box is held
+     before it loads, and the small copies beside the site for cards, lists, galleries and previews */
+  App.art = (function () {
+    try { var a = JSON.parse(document.getElementById("art").textContent); return a && a.base && a.folders ? a : null; }
+    catch (e) { return null; }
+  })();
+  App.artOf = function (url) {
+    var a = App.art, s = String(url || "");
+    if (!a || s.indexOf(a.base) !== 0) return null;
+    var path = s.slice(a.base.length), size = a.folders[path.split("/")[0]];
+    return size && path.indexOf("/") > 0 ? {thumb: a.thumbs + path, w: size[0], h: size[1]} : null;
   };
+  /* small: the thumbnail (a card, a list, a preview); a thumbnail that fails falls back to the full picture */
+  App.img = function (url, alt, cls, small) {
+    if (!url) return "";
+    var art = App.artOf(url), src = art && small ? art.thumb : url;
+    return '<img loading="lazy" src="' + App.esc(src) + '"' + (art ? ' width="' + art.w + '" height="' + art.h + '"' : "") +
+      (src !== url ? ' data-full="' + App.esc(url) + '"' : "") + ' alt="' + App.esc(alt || "") + '"' + (cls ? ' class="' + cls + '"' : "") + ">";
+  };
+  document.addEventListener("error", function (e) {
+    var t = e.target;
+    if (t && t.tagName === "IMG" && t.dataset.full && t.getAttribute("src") !== t.dataset.full) t.src = t.dataset.full;
+  }, true);
   /* read (no value) or write a per-viewer value; a write answers whether the browser kept it */
   App.tryStore = function (k, v) {
     try {
@@ -140,7 +160,7 @@
   function resultsHtml(list) {
     return list.map(function (e, i) {
       return '<a role="option" id="opt' + i + '" aria-selected="' + (i === 0) + '" href="' + App.href(e.kind, e.id) + '"' + (i === 0 ? ' class="on"' : "") + ">" +
-             (e.img ? App.img(e.img, "") : "") + "<span>" + App.esc(e.name) + '</span><span class="kind">' + LABEL[e.kind] + "</span></a>";
+             (e.img ? App.img(e.img, "", "", true) : "") + "<span>" + App.esc(e.name) + '</span><span class="kind">' + LABEL[e.kind] + "</span></a>";
     }).join("");
   }
   function wireSearch() {
@@ -455,5 +475,7 @@
     });
     window.addEventListener("popstate", route);
     route();
+    // offline reading (sw.js, scoped to this folder): after the page is up, so its storing never slows the first visit
+    if ("serviceWorker" in navigator && window.isSecureContext) navigator.serviceWorker.register("sw.js").catch(function () {});
   }).catch(function (e) { App.h("<h1>Could not load the lorebook</h1><p class='note'>" + App.esc(e.message) + "</p>"); });
 })();
