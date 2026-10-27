@@ -4,7 +4,7 @@
    over: a page never mixes two builds' scripts and data. Pages come from the network first; offline, the site's home page
    stands in for any page and the app draws the asked one from the stored data. Pictures are kept as they are seen (the newest
    MAX_IMAGES), per build. */
-var LOREBOOK = {"version": "f8068ab0c7f7e188", "shell": ["./", "app.js", "pages.js", "bench.js", "depth.js", "play.js", "reader.js", "style.css", "data.json", "manifest.webmanifest", "favicon.ico", "apple-touch-icon.png", "icon-192.png", "icon-512.png"]};
+var LOREBOOK = {"version": "d7cec2127930aa32", "shell": ["./", "app.js", "pages.js", "bench.js", "depth.js", "play.js", "reader.js", "style.css", "data.json", "manifest.webmanifest", "favicon.ico", "apple-touch-icon.png", "icon-192.png", "icon-512.png"]};
 var STATIC = "lore-static-" + LOREBOOK.version, IMAGES = "lore-images-" + LOREBOOK.version, MAX_IMAGES = 400;
 
 self.addEventListener("install", function (e) {

@@ -317,7 +317,8 @@ button.been[aria-pressed="true"]::before { background: var(--color-success); bor
   main { padding: var(--space-lg); }
   .article, .cols, .tocgrid { grid-template-columns: 1fr; }
   .rail, .article > .infobox { position: static; max-height: none; }
-  .tocgrid > .rail { order: -1; }
+  .tocgrid > .rail, .article > .rail { order: -1; }   /* the infobox first on phones, as the pre-rendered page has it (an infobox moved
+                                                      into the rail fell below the text: the page's largest paint waited for the app) */
   .infobox { order: -1; }
   .infobox img { max-height: 300px; object-fit: cover; object-position: top; }
   .form { grid-template-columns: 1fr; }
