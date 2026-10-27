@@ -229,13 +229,13 @@
     if (id) {
       var f = U.find("factions", id);
       if (!f) return U.missing("Factions");
-      var members = U.uniq(A.data.npcs.filter(function (n) { return n.faction === f.name; }));
+      var members = U.uniq(A.data.npcs.filter(function (n) { return n.faction === f.name && !A.hidden(n); }));
       var names = {}; members.forEach(function (n) { names[n.name] = 1; });
-      var seats = A.data.locations.filter(function (l) { return l.factions.indexOf(f.name) >= 0; });
+      var seats = A.data.locations.filter(function (l) { return l.factions.indexOf(f.name) >= 0 && !A.hidden(l); });
       var jobs = A.data.say.filter(function (s) { return s.key === "fac_job"; })[0];
       var job = jobs && jobs.triggers.filter(function (t) { return t.key.indexOf(f.id.replace(/-/g, "_")) >= 0; })[0];
       var ladder = f.ranks.length ? X.ladder(f) : [], ties = X.ties(f);
-      var work = questsOf(function (q) { return names[q.giver] && q.kind !== "Rank mission"; });
+      var work = questsOf(function (q) { return names[q.giver] && q.kind !== "Rank mission" && !A.hidden(q); });
       A.h(U.crumbs([["Factions", "factions/"], [f.name]]) + "<h1>" + esc(f.name) + '</h1><div class="article"><div class="prose">' + A.prose(f.info, f.name) +
         (ladder.length ? '<h2>Ranks</h2><p>Swear the oath to join, then each rank is earned by its mission. See <a href="mechanics/oaths-and-ranks/">Oaths and Ranks</a>.</p><ol class="ranks">' +
           ladder.map(function (s) {
@@ -279,13 +279,13 @@
     }).sort(function (a, b) { return a.lo - b.lo || a.hi - b.hi; });
   };
   X.firstQuests = function (n) {   // quests that open a line or stand alone, at the gentlest places
-    return A.data.quests.filter(function (q) { return q.kind === "Side quest" || (q.kind === "Quest line" && q.part === 1); }).map(function (q) {
+    return A.data.quests.filter(function (q) { return (q.kind === "Side quest" || (q.kind === "Quest line" && q.part === 1)) && !A.hidden(q); }).map(function (q) {
       var p = placeOf(q.place); return {q: q, lo: p && p.levels && p.levels.length ? p.levels[0] : 99};
     }).sort(function (a, b) { return a.lo - b.lo || a.q.name.localeCompare(b.q.name); }).slice(0, n);
   };
   var FIRST_SAY = ["route", "bounty_board", "fac_oath", "asg_training", "gather_", "recruit_"];
   P.guide = function () {
-    var starts = A.data.starts.map(function (s) { return {s: s, i: X.startInfo(s)}; });
+    var starts = A.data.starts.filter(function (s) { return !A.hidden(s); }).map(function (s) { return {s: s, i: X.startInfo(s)}; });
     var gentle = starts.filter(function (x) { return x.i.guided && x.i.danger === "Low"; }).sort(function (a, b) { return a.i.low - b.i.low; }).slice(0, 6);
     var solo = starts.filter(function (x) { return !x.i.party; }).length;
     var say = FIRST_SAY.map(function (k) { return A.data.say.filter(function (f) { return f.key === k; })[0]; }).filter(Boolean);

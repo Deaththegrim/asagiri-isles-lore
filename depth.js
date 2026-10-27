@@ -83,7 +83,7 @@
   };
 
   D.connectionsHtml = function (n) {
-    var list = D.connections(n);
+    var list = D.connections(n).filter(function (c) { return !A.hidden(c.r); });   // people after the war stay covered
     if (!list.length) return "";
     var text = list.filter(function (c) { return c.names || c.named; });
     var HOW = {both: "they name each other", names: "named in " + n.name + "'s story", named: "names " + n.name, fac: "same faction", home: "same home"};

@@ -70,6 +70,9 @@
   App.KIND = KIND;
   var LABEL = {people: "Person", places: "Place", factions: "Faction", creatures: "Creature", lore: "Lore", mechanics: "Guide",
                abilities: "Ability", traits: "Trait", skills: "Skill", items: "Item", starts: "Story start", map: "Map", quests: "Quest"};
+  App.LABEL = LABEL;
+  /* an entry the reader keeps covered (reader.js: after the war, until they choose to see it) */
+  App.hidden = function (r) { return !!App.spoil && App.spoil.hides(r); };
 
   /* how many entries a section lists: people once each, however many eras they have */
   App.count = function (d) {
@@ -122,6 +125,7 @@
     var words = q.split(/\s+/);
     var out = [];
     App.index.forEach(function (e) {
+      if (App.hidden(App.byId[e.kind + "/" + e.id])) return;
       var score = 0;
       if (e.n === q) score = 100;
       else if (e.n.indexOf(q) === 0) score = 60;
@@ -226,12 +230,14 @@
   };
   App.first = function (text, n) {
     var s = String(text || "").replace(/^\[[^\]]*\]\s*/, "").replace(/\*\*/g, "").split("\n")[0];
-    return s.length > (n || 160) ? s.slice(0, n || 160).replace(/\s+\S*$/, "") + "..." : s;
+    return s.length > (n || 160) ? s.slice(0, n || 160).replace(/\s+\S*$/, "").replace(/[.,;:!?]+$/, "") + "..." : s;
   };
 
   /* list page helper: filters + a card grid with "show more" */
   App.listPage = function (opt) {
-    var state = {q: "", f: {}, n: 120, view: opt.table && App.param("view") === "table" ? "table" : "cards", sort: 0, dir: 1};
+    var all = opt.rows;
+    opt.rows = all.filter(function (r) { return !App.hidden(r); });
+    var state ={q: "", f: {}, n: 120, view: opt.table && App.param("view") === "table" ? "table" : "cards", sort: 0, dir: 1};
     Object.keys(opt.facet || {}).forEach(function (k) { if (App.param(k)) state.f[k] = App.param(k); });   // only this list's own filters
     function rows() {
       var q = state.q.toLowerCase();
@@ -280,7 +286,8 @@
     App.h('<div class="crumbs"><a href="./">Home</a> / ' + opt.title + "</div><h1>" + opt.title + '</h1><p class="lede">' + opt.lede +
       '</p><div class="filters"><input type="search" id="lf" placeholder="Filter ' + opt.title.toLowerCase() + '..." aria-label="Filter ' + opt.title + '">' +
       facets + (opt.table ? '<button type="button" id="view" aria-pressed="' + (state.view === "table") + '">' + (state.view === "table" ? "Show cards" : "Show as a table") + "</button>" : "") +
-      '<span class="count" id="count" aria-live="polite"></span></div><div class="grid' + (opt.wide ? " wide" : "") + '" id="grid"></div>' +
+      '<span class="count" id="count" aria-live="polite"></span>' + (App.spoil ? App.spoil.listNote(all.length - opt.rows.length, opt.title.toLowerCase()) : "") +
+      '</div><div class="grid' + (opt.wide ? " wide" : "") + '" id="grid"></div>' +
       '<button class="more" id="more">Show more</button>');
     document.getElementById("lf").addEventListener("input", function (e) { state.q = e.target.value; state.n = 120; draw(); });
     document.querySelectorAll("[data-f]").forEach(function (s) {
@@ -323,7 +330,7 @@
     ["npcs", "locations", "factions", "creatures", "lore", "books", "items", "starts"].forEach(function (d) {
       var kind = KIND[d], seen = {};
       App.data[d].forEach(function (r) {
-        if ((kind === selfKind && (r.id === selfId || r.name === name)) || seen[r.name]) return;
+        if ((kind === selfKind && (r.id === selfId || r.name === name)) || seen[r.name] || App.hidden(r)) return;
         var text = r.info + " " + (r.areas || []).map(function (a) { return a.text; }).join(" ");
         if (re.test(text)) { seen[r.name] = 1; out.push({kind: kind, r: r}); }
       });
@@ -350,6 +357,7 @@
     if (!/^map/.test(key)) window.scrollTo(0, 0);
     document.title = (document.querySelector("main h1") || {}).textContent + " · Asagiri Lorebook";
     onThisPage();
+    if (App.reader) App.reader.routed(key, parts.slice(1).join("/"));
     if (routed) document.getElementById("main").focus({preventScroll: true});   // the new page, not the top of the old one
     routed = true;
   }
@@ -411,6 +419,7 @@
   document.body.appendChild(top);
   window.addEventListener("scroll", function () { top.hidden = window.scrollY < 900; }, {passive: true});
   var routed = false;
+  App.route = route;   // redraws the page in place (reader.js, after a switch)
 
   function drawer(on) {
     document.getElementById("side").classList.toggle("open", on);
@@ -430,6 +439,7 @@
     buildIndex();
     buildLinker();
     buildNav();
+    if (App.reader) App.reader.init();
     wireSearch();
     if (location.hash.indexOf("#/") === 0) {   // an old #/ link: the same page at its real address
       var old = location.hash.slice(2).split("?");

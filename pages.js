@@ -32,8 +32,9 @@
   }
   function accent(d) { return d && dcol(d) ? ' style="--dc:' + dcol(d) + '"' : ""; }
   function card(kind, r, sub, land) {
-    var d = districtOf(kind, r);
-    return '<a class="card' + (d ? " dc" : "") + '" href="' + A.href(kind, r.id) + '"' + accent(d) + (d ? ' title="' + esc(d) + '"' : "") + ">" + (r.img !== undefined ? '<div class="pic' + (land ? " land" : "") + '">' +
+    var d = districtOf(kind, r), been = kind === "places" && A.been && A.been.has(r.id);
+    return '<a class="card' + (d ? " dc" : "") + (been ? " visited" : "") + '" href="' + A.href(kind, r.id) + '"' + accent(d) +
+      (d || been ? ' title="' + esc((d || "") + (been ? (d ? " · " : "") + "been there" : "")) + '"' : "") + ">" + (r.img !== undefined ? '<div class="pic' + (land ? " land" : "") + '">' +
       A.img(r.img, r.name) + "</div>" : "") + '<div class="body"><div class="t">' + esc(r.name) + "</div>" +
       (sub ? '<div class="s">' + sub + "</div>" : "") + (land || r.img === undefined ? '<div class="x">' + esc(A.first(r.info)) + "</div>" : "") +
       "</div></a>";
@@ -96,7 +97,7 @@
       while (list.length && out.length < n) out.push(list.splice(Math.floor(Math.random() * list.length), 1)[0]);
       return out;
     };
-    var people = some(uniq(d.npcs.filter(function (n) { return n.img; })), 6);
+    var people = some(uniq(d.npcs.filter(function (n) { return n.img && !A.hidden(n); })), 6);
     var scenic = d.locations.filter(function (l) { return l.img && l.region === "The Asagiri Isles" && l.kind === "complex"; });
     var hero = some(scenic, 1)[0], places = some(scenic.filter(function (l) { return l !== hero; }), 4);
     var all = districtsAll(), dnames = Object.keys(all).sort();
@@ -166,9 +167,10 @@
   /* ---------- places ---------- */
   P.places = function (id) {
     if (id) return placePage(id);
+    var facet = {era: function (r) { return era(r.region); }, district: function (r) { return r.district; }, kind: function (r) { return r.kind; }};
+    if (A.been.count()) facet.been = function (r) { return A.been.has(r.id) ? "Been there" : "Not yet"; };   // only once the reader marks a place
     A.listPage({title: "Places", rows: A.data.locations, lede: "Towns, shrines, wilds and depths, before and after the war.",
-      facet: {era: function (r) { return era(r.region); }, district: function (r) { return r.district; }, kind: function (r) { return r.kind; }},
-      names: {era: "Era", district: "District", kind: "Kind"},
+      facet: facet, names: {era: "Era", district: "District", kind: "Kind", been: "Been there"},
       card: function (r) { return card("places", r, esc(r.district || r.region) + (levels(r.levels) ? " · lv " + levels(r.levels) : ""), true); }});
   };
   function sayHere(name) {
@@ -187,7 +189,8 @@
     if (!p) return missing("Places");
     var people = A.data.npcs.filter(function (n) { return n.location === p.name; });
     var reg = regionOf(p.region), here = sayHere(p.name);
-    A.h(crumbs([["Places", "places/"], [p.name]]) + "<h1>" + esc(p.name) + '</h1><div class="article"><div class="prose">' +
+    A.h(crumbs([["Places", "places/"], [p.name]]) + "<h1>" + esc(p.name) + '</h1><p class="beenrow">' + A.been.button(p) +
+      '<span id="beenkept"></span></p><div class="article"><div class="prose">' +
       A.prose(p.info.replace(/^\[[^\]]*\]\s*/, ""), p.name) +
       (here.length ? "<h2>What you can do here</h2><ul>" + here.map(function (h) {
         return '<li><a href="say/' + h.f.key + '/">' + esc(h.f.label) + "</a>" + (h.t.examples[0] ? ": <code>" + esc(h.t.examples[0]) + "</code>" : "") + "</li>";
@@ -212,7 +215,7 @@
     var places = A.data.locations.filter(function (l) { return l.region === reg.name; });
     var dists = {}; places.forEach(function (p) { if (p.district) dists[p.district] = 1; });
     var main = ["The Asagiri Isles", "The Asagiri Isles, After the War", "The Otherworld"];
-    var opts = regs.slice().sort(function (a, b) {
+    var opts = regs.filter(function (r) { return r === reg || !A.hidden(r); }).sort(function (a, b) {
       var ia = main.indexOf(a.name), ib = main.indexOf(b.name);
       return (ia < 0 ? 9 : ia) - (ib < 0 ? 9 : ib) || a.name.localeCompare(b.name);
     });
@@ -222,9 +225,10 @@
       Object.keys(dists).sort().map(function (d) { return "<option>" + esc(d) + "</option>"; }).join("") +
       '</select><input id="mfind" type="search" placeholder="Find a place on this map" aria-label="Find a place" list="mlist"><datalist id="mlist">' +
       places.map(function (p) { return '<option value="' + esc(p.name) + '">'; }).join("") +
-      '</datalist><label><input type="checkbox" id="mlbl"> Show labels</label><span class="count">' + places.length + " places</span></div>" +
+      '</datalist><label><input type="checkbox" id="mlbl"> Show labels</label><span class="count" id="mcount"></span>' +
+      '<button type="button" id="mclear" hidden>Clear my marks</button><span id="beenkept"></span>' + A.spoil.listNote(regs.length - opts.length, regs.length - opts.length === 1 ? "map" : "maps") + "</div>" +
       (Object.keys(dists).length ? '<div class="dchips small" id="mlegend">' + Object.keys(dists).sort().map(function (d) {
-        return '<button type="button" data-d="' + esc(d) + '"' + accent(d) + "><i></i>" + esc(d) + "</button>";
+        return '<button type="button" data-d="' + esc(d) + '"' + accent(d) + "><i></i>" + esc(d) + '<span class="prog" data-prog="' + esc(d) + '"></span></button>';
       }).join("") + "</div>" : "") +
       '<div class="map" id="map" tabindex="0" aria-label="Map of ' + esc(reg.name) + ': drag or arrow keys to pan, + and - to zoom; find a place with the box above">' +
       '<div class="stage" id="stage">' + A.img(reg.map, reg.name).replace('loading="lazy" ', "") +
@@ -303,7 +307,7 @@
       pop.innerHTML = (p.img ? A.img(p.img, p.name) : "") + '<div class="body"><h3><a href="' + A.href("places", p.id) + '">' + esc(p.name) +
         "</a></h3><div class='note'>" + esc(p.district || "") + (levels(p.levels) ? " · level " + levels(p.levels) : "") + "</div><p>" +
         esc(A.first(p.info, 260)) + "</p>" + (people.length ? "<div class='note'>" + people.length + " people here</div>" : "") +
-        '<button id="pclose">Close</button></div>';
+        '<p class="popbtns">' + A.been.button(p) + '<button id="pclose">Close</button></p></div>';
       document.getElementById("pclose").onclick = closePop;
       if (keyed) pop.focus();
     }
@@ -361,6 +365,29 @@
       document.querySelectorAll("#mlegend button").forEach(function (b) { b.setAttribute("aria-pressed", b.dataset.d === d ? "true" : "false"); });
       placeLabels();
     };
+    /* the reader's marks: pins they have been to, each district's progress on its legend chip, the count, the clear button */
+    function tally() {
+      if (!stage.isConnected) { A.been.changed = null; return; }   // the reader has left this map
+      var prog = A.been.progress(places), n = 0;
+      stage.querySelectorAll(".pin").forEach(function (b) { var on = A.been.has(b.dataset.id); b.classList.toggle("been", on); if (on) n++; });
+      document.querySelectorAll("#mlegend [data-prog]").forEach(function (s) {
+        var o = prog[s.dataset.prog]; s.textContent = n && o ? o[0] + "/" + o[1] : "";
+      });
+      document.getElementById("mcount").textContent = places.length + " places" + (n ? " · been to " + n : "");
+      var c = document.getElementById("mclear");
+      c.hidden = !A.been.count(); c.textContent = "Clear my marks"; c.dataset.armed = "";
+      document.getElementById("beenkept").innerHTML = A.been.keptNote();
+    }
+    A.been.changed = tally;
+    var clear = document.getElementById("mclear");
+    clear.onclick = function () {   // asks once in place: a second press clears every mark, on every map
+      if (!this.dataset.armed) { this.dataset.armed = "1"; this.textContent = "Clear all " + A.been.count() + " marks?"; return; }
+      A.been.clear();
+      pop.querySelectorAll("[data-been]").forEach(function (x) { x.setAttribute("aria-pressed", "false"); });
+      tally();
+    };
+    clear.onblur = function () { if (this.dataset.armed) { this.dataset.armed = ""; this.textContent = "Clear my marks"; } };
+    tally();
     var legend = document.getElementById("mlegend");
     if (legend) legend.onclick = function (e) {
       var b = e.target.closest("button[data-d]"); if (!b) return;
@@ -584,6 +611,7 @@
     var lore = function (n) { return A.byName("lore", "District: " + n); };
     var isles = regionOf("The Asagiri Isles");
     if (!id) {
+      var marked = A.been.count(), prog = A.been.progress(A.data.locations.filter(function (l) { return l.region === "The Asagiri Isles"; }));
       A.h(crumbs([["Districts"]]) + '<h1>Districts</h1><p class="lede">The isles are twelve districts on one map, from the gentle plain around ' +
         'Miyako to the ice of Hyoga Reach. Each one\'s level band covers everything in it.</p><div class="grid wide">' +
         names.map(function (n) {
@@ -593,7 +621,7 @@
           var band = lv.length ? Math.min.apply(null, lv) + "-" + Math.max.apply(null, lv) : "";
           var lr = lore(n);
           return '<a class="card dc" href="districts/' + sl(n) + '/"' + accent(n) + '><div class="pic land">' + A.img(hub.img, n) + '</div><div class="body"><div class="t">' +
-            esc(n) + '</div><div class="s">' + places.length + " places" + (band ? " · level " + band : "") + '</div><div class="x">' +
+            esc(n) + '</div><div class="s">' + places.length + " places" + (band ? " · level " + band : "") + (marked ? " · been to " + (prog[n] || [0])[0] : "") + '</div><div class="x">' +
             esc(lr ? A.first(lr.info.replace(/^.*? is a district of the Asagiri Isles\. /, ""), 140) : "") + "</div></div></a>";
         }).join("") + "</div>");
       return;
@@ -602,15 +630,20 @@
     if (!name) return missing("Districts");
     var before = all[name].filter(function (l) { return l.region === "The Asagiri Isles"; });
     var after = all[name].filter(function (l) { return l.region === "The Asagiri Isles, After the War"; });
-    var here = {}; all[name].forEach(function (l) { here[l.name] = 1; });
-    var people = uniq(A.data.npcs.filter(function (n) { return here[n.location]; }));
-    var facs = {}; all[name].forEach(function (l) { l.factions.forEach(function (f) { facs[f] = 1; }); });
+    var shown = all[name].filter(function (l) { return !A.hidden(l); }), lateHidden = after.length && A.hidden(after[0]);
+    var here = {}; shown.forEach(function (l) { here[l.name] = 1; });
+    var people = uniq(A.data.npcs.filter(function (n) { return here[n.location] && !A.hidden(n); }));
+    var facs = {}; shown.forEach(function (l) { l.factions.forEach(function (f) { facs[f] = 1; }); });
+    var mine = A.been.count() ? A.been.progress(shown)[name] : null;
     var lr = lore(name);
     A.h(crumbs([["Districts", "districts/"], [name]]) + '<h1 class="dh"' + accent(name) + ">" + esc(name) + '</h1><div class="prose">' + (lr ? A.prose(lr.info, name) : "") +
       "</div><p>" + (isles ? '<a href="map/' + isles.id + "/?district=" + encodeURIComponent(name) + '">Show it on the map</a> · ' : "") +
       '<a href="people/?district=' + encodeURIComponent(name) + '">Everyone here</a></p>' +
+      (mine ? '<p class="beenbar"><span>Been to ' + mine[0] + " of " + mine[1] + ' places here</span><meter min="0" max="' + mine[1] + '" value="' + mine[0] +
+        '" aria-label="Places of ' + esc(name) + ' you have been to"></meter></p>' : "") +
       "<h2>Places before the war</h2><div class='grid'>" + before.map(function (l) { return card("places", l, esc(l.kind) + (levels(l.levels) ? " · lv " + levels(l.levels) : ""), true); }).join("") + "</div>" +
-      (after.length ? "<h2>Places after the war</h2><div class='grid'>" + after.map(function (l) { return card("places", l, esc(l.kind) + (levels(l.levels) ? " · lv " + levels(l.levels) : ""), true); }).join("") + "</div>" : "") +
+      (lateHidden ? "<h2>Places after the war</h2><p>" + A.spoil.listNote(after.length, "places") + "</p>" :
+        after.length ? "<h2>Places after the war</h2><div class='grid'>" + after.map(function (l) { return card("places", l, esc(l.kind) + (levels(l.levels) ? " · lv " + levels(l.levels) : ""), true); }).join("") + "</div>" : "") +
       (Object.keys(facs).length ? "<h2>Factions here</h2><div class='grid wide'>" + Object.keys(facs).sort().map(function (f) {
         var r = A.byName("factions", f); return r ? card("factions", r, esc(r.type)) : "";
       }).join("") + "</div>" : "") +
