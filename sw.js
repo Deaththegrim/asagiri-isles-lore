@@ -6,7 +6,7 @@
    that build's. Pages come from the network first; offline, the stored home page stands in for any page and the app draws the
    asked one from the stored data. Pictures answer from the store and are refreshed behind it (the newest MAX_IMAGES, per build).
    Every site of the host shares one origin and so one cache storage: this site's stores carry its folder's name. */
-var LOREBOOK = {"version": "ab1c54006755775d", "shell": ["./", "app.js?v=ab1c54006755775d", "pages.js?v=ab1c54006755775d", "bench.js?v=ab1c54006755775d", "depth.js?v=ab1c54006755775d", "play.js?v=ab1c54006755775d", "reader.js?v=ab1c54006755775d", "style.css?v=ab1c54006755775d", "data.json?v=ab1c54006755775d", "manifest.webmanifest", "favicon.ico", "apple-touch-icon.png", "icon-192.png", "icon-512.png"]};
+var LOREBOOK = {"version": "926964b71eafe6a5", "shell": ["./", "app.js?v=926964b71eafe6a5", "pages.js?v=926964b71eafe6a5", "bench.js?v=926964b71eafe6a5", "depth.js?v=926964b71eafe6a5", "play.js?v=926964b71eafe6a5", "reader.js?v=926964b71eafe6a5", "style.css?v=926964b71eafe6a5", "data.json?v=926964b71eafe6a5", "manifest.webmanifest", "favicon.ico", "apple-touch-icon.png", "icon-192.png", "icon-512.png"]};
 var SITE = self.registration.scope.replace(/\/+$/, "").split("/").pop() || "lore";
 var STATIC = SITE + "-static-" + LOREBOOK.version, IMAGES = SITE + "-images-" + LOREBOOK.version, MAX_IMAGES = 400;
 
