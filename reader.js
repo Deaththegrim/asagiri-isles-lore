@@ -6,22 +6,17 @@
   var A = window.App, esc = A.esc;
 
   /* ---------- after the war: covered until the reader chooses to see it (spoiler practice: warn, cover, one switch) ---------- */
-  var LATE_REGION = "The Asagiri Isles, After the War";
-  var S = A.spoil = {key: "asagiri-lore:after-war", late: null};
+  var S = A.spoil = {key: "asagiri-lore:after-war", late: null};   // the key the shell's head script also reads
   var opened = [];   // records shown once on their own page this visit ("Show this page")
-  /* what is after the war: the post-war map and each post-war place's depths ("<post-war place> Depths"), their places, the people
-     who live there, the quests given there, the lore entries named for it and the starts that open in it */
+  /* what is after the war comes with the data ({section: [ids]}, asagiri_lore_data.late): the same set the pre-rendered pages
+     cover before this script runs */
   S.init = function () {
-    var d = A.data, late = new Set(), lateRegion = {}, latePlace = {};
-    d.locations.forEach(function (l) { if (l.region === LATE_REGION) latePlace[l.name] = 1; });
-    d.regions.forEach(function (r) {
-      if (r.name === LATE_REGION || latePlace[r.name.replace(/ Depths$/, "")]) { lateRegion[r.name] = 1; late.add(r); }
+    var late = new Set(), L = A.data.late || {};
+    Object.keys(L).forEach(function (sec) {
+      var ids = {};
+      L[sec].forEach(function (i) { ids[i] = 1; });
+      (A.data[sec] || []).forEach(function (r) { if (ids[r.id]) late.add(r); });
     });
-    d.locations.forEach(function (l) { if (lateRegion[l.region]) { latePlace[l.name] = 1; late.add(l); } });
-    d.npcs.forEach(function (n) { if (latePlace[n.location]) late.add(n); });
-    d.quests.forEach(function (q) { if (latePlace[q.place]) late.add(q); });
-    d.lore.forEach(function (r) { if (/^After the (Great )?War\b/.test(r.name)) late.add(r); });
-    d.starts.forEach(function (r) { if (/After the War/.test(r.info)) late.add(r); });
     S.late = late;
   };
   var fallback = null;   // the switch's value while the browser keeps nothing (private windows, blocked storage)
@@ -31,6 +26,7 @@
     fallback = A.tryStore(S.key, show) ? null : show;
     var sw = document.getElementById("spoilsw"), note = document.getElementById("spoilnote");
     if (sw) sw.checked = S.shown();
+    document.documentElement.classList.toggle("showlate", S.shown());   // the pre-rendered cover's switch (style.css)
     if (note) note.textContent = fallback === null ? "" : "This browser is not keeping settings: the switch lasts until you leave.";
     A.route();
   };
@@ -71,16 +67,22 @@
       '<div class="pv-body"><div class="pv-k">' +
       esc(label) + (sub && sub !== label ? " · " + esc(sub) : "") + '</div><div class="pv-t">' + esc(r.name) + "</div>" + (text ? "<p>" + esc(text) + "</p>" : "") + "</div>";
   };
+  /* the entry at a path under the site's root ("people/x/"), or null: what a link's preview shows (pure: the gate runs it on
+     every link the pages make) */
+  function entryAt(path) {
+    var m = String(path).match(/^([a-z]+)\/([^/]+)\/$/);
+    if (!m || m[1] === "map") return null;
+    var r = A.byId[m[1] + "/" + decodeURIComponent(m[2])];
+    return r ? {kind: m[1], r: r} : null;
+  }
   /* the entry a text link opens, or null: cards, tiles, the nav, search results, tabs and the preview itself already say enough */
   function entryOf(a) {
-    if (!a || a.closest(".card, .tile, #preview, #side, .search, .toc, .tabs, .crumbs, .bannerlinks, .pop, .pin")) return null;
+    if (!a || !a.isConnected || a.closest(".card, .tile, #preview, #side, .search, .toc, .tabs, .crumbs, .bannerlinks, .pop, .pin")) return null;
     var u;
     try { u = new URL(a.href, document.baseURI); } catch (e) { return null; }
     if (u.origin !== location.origin || u.search || u.pathname.indexOf(A.root) !== 0) return null;
-    var m = decodeURIComponent(u.pathname.slice(A.root.length)).match(/^([a-z]+)\/([^/]+)\/$/);
-    if (!m || m[1] === "map" || A.path() === m[1] + "/" + m[2]) return null;
-    var r = A.byId[m[1] + "/" + m[2]];
-    return r ? {kind: m[1], r: r} : null;
+    var path = u.pathname.slice(A.root.length);
+    return A.path() + "/" === decodeURIComponent(path) ? null : entryAt(path);
   }
   function place(a, y) {
     var rects = [].slice.call(a.getClientRects()), rc = rects[0];
@@ -92,7 +94,7 @@
     box.style.top = top + window.scrollY + "px";
   }
   function open(a, y) {
-    var t = entryOf(a);
+    var t = entryOf(a);   // null too for a link the page has redrawn since the pointer came to rest (a filtered table)
     if (!t) return;
     if (!PV.box) {
       PV.box = document.createElement("div");
@@ -118,7 +120,7 @@
   }
   function later(fn, ms) { clearTimeout(PV.hide); PV.hide = setTimeout(fn, ms); }
   function wirePreviews() {
-    if (!(window.matchMedia && window.matchMedia("(hover: hover) and (pointer: fine)").matches)) return;   // phones: no previews
+    if (!(window.matchMedia && window.matchMedia("(hover: hover) and (pointer: fine)").matches)) return false;   // phones: no previews
     document.addEventListener("mouseover", function (e) {
       var a = e.target.closest && e.target.closest("#main a[href]");
       if (!a || a === PV.a) { if (a) clearTimeout(PV.hide); return; }
@@ -143,6 +145,7 @@
     document.addEventListener("keydown", function (e) { if (e.key === "Escape" && PV.a) close(); });
     document.addEventListener("click", close);
     window.addEventListener("scroll", function () { if (PV.a) close(); }, {passive: true});
+    return true;
   }
 
   /* ---------- been there: a reader's own marks on places, with progress per district (MapGenie's found-it marks) ---------- */
@@ -175,6 +178,15 @@
   B.button = function (p) {
     return '<button type="button" class="been" data-been="' + esc(p.id) + '" aria-pressed="' + B.has(p.id) + '">Been there</button>';
   };
+  /* a press on a place's toggle: every toggle of that place, the kept note and the page that listens (the map) follow */
+  B.press = function (id) {
+    var on = B.toggle(id);
+    document.querySelectorAll('[data-been="' + id + '"]').forEach(function (x) { x.setAttribute("aria-pressed", on); });
+    var k = document.getElementById("beenkept");
+    if (k) k.innerHTML = B.keptNote();
+    if (B.changed) B.changed(id);
+    return on;
+  };
   B.keptNote = function () { return kept === false ? '<span class="note">This browser is not keeping marks: they go when you leave.</span>' : ""; };
 
   /* ---------- wiring ---------- */
@@ -196,23 +208,23 @@
           return;
         }
         var b = e.target.closest("[data-been]");
-        if (!b) return;
-        var on = B.toggle(b.dataset.been);
-        document.querySelectorAll('[data-been="' + b.dataset.been + '"]').forEach(function (x) { x.setAttribute("aria-pressed", on); });
-        var k = document.getElementById("beenkept");
-        if (k) k.innerHTML = B.keptNote();
-        if (B.changed) B.changed(b.dataset.been);
+        if (b) B.press(b.dataset.been);
       });
       window.addEventListener("storage", function (e) { if (e.key === B.key) marks = null; });   // marks made in another tab
-      wirePreviews();
+      A.reader.previews = wirePreviews();
+    },
+    entryAt: entryAt,
+    /* the record a route's page is about when the reader keeps it covered, else null (pure: the gate runs it) */
+    coverFor: function (key, rest) {
+      var r = key === "map" && !rest ? null : A.byId[key + "/" + rest];
+      return S.hides(r) ? r : null;
     },
     /* after every page draws: no preview left over, and an after-the-war page covered */
     routed: function (key, rest) {
       close();
       S.veiled = null;
-      if (key === "map" && !rest) return;
-      var r = A.byId[key + "/" + rest];
-      if (S.hides(r)) veil(r, key === "map");
+      var r = A.reader.coverFor(key, rest);
+      if (r) veil(r, key === "map");
     }
   };
 })();

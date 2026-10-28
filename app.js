@@ -91,8 +91,10 @@
   var LABEL = {people: "Person", places: "Place", factions: "Faction", creatures: "Creature", lore: "Lore", mechanics: "Guide",
                abilities: "Ability", traits: "Trait", skills: "Skill", items: "Item", starts: "Story start", map: "Map", quests: "Quest"};
   App.LABEL = LABEL;
-  /* an entry the reader keeps covered (reader.js: after the war, until they choose to see it) */
-  App.hidden = function (r) { return !!App.spoil && App.spoil.hides(r); };
+  /* an entry the reader keeps covered (reader.js: after the war, until they choose to see it); the app refuses to start
+     without reader.js, so this never fails open */
+  App.hidden = function (r) { return App.spoil.hides(r); };
+  App.visible = function (rows) { return rows.filter(function (r) { return !App.hidden(r); }); };
 
   /* how many entries a section lists: people once each, however many eras they have */
   App.count = function (d) {
@@ -126,7 +128,8 @@
   }
 
   /* ---------- search ---------- */
-  function buildIndex() {
+  App.buildIndex = function () {
+    App.index = []; App.byId = {};
     Object.keys(KIND).forEach(function (d) {
       var seen = {};
       (App.data[d] || []).forEach(function (r) {
@@ -138,7 +141,7 @@
                         t: (r.name + " " + (r.type || "") + " " + (r.category || "") + " " + (r.info || "")).toLowerCase()});
       });
     });
-  }
+  };
   App.search = function (q, limit) {
     q = q.trim().toLowerCase();
     if (!q) return [];
@@ -205,7 +208,7 @@
 
   /* ---------- text: links + light markdown ---------- */
   var LINKER = null, LINKS = {};
-  function buildLinker() {
+  App.buildLinker = function () {
     var names = [];
     [["npcs", "people"], ["locations", "places"], ["factions", "factions"], ["creatures", "creatures"]].forEach(function (p) {
       App.data[p[0]].forEach(function (r) {
@@ -215,7 +218,7 @@
     names.sort(function (a, b) { return b.length - a.length; });
     var alt = names.map(function (n) { return App.esc(n).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }).join("|");
     LINKER = new RegExp("(^|[^\\w'])(" + alt + ")(?![\\w])", "g");
-  }
+  };
   App.link = function (escaped, self) {
     return escaped.replace(LINKER, function (m, pre, name) {
       var raw = name.replace(/&amp;/g, "&").replace(/&quot;/g, '"');
@@ -256,7 +259,7 @@
   /* list page helper: filters + a card grid with "show more" */
   App.listPage = function (opt) {
     var all = opt.rows;
-    opt.rows = all.filter(function (r) { return !App.hidden(r); });
+    opt.rows = App.visible(all);
     var state ={q: "", f: {}, n: 120, view: opt.table && App.param("view") === "table" ? "table" : "cards", sort: 0, dir: 1};
     Object.keys(opt.facet || {}).forEach(function (k) { if (App.param(k)) state.f[k] = App.param(k); });   // only this list's own filters
     function rows() {
@@ -451,15 +454,21 @@
   function topHeight() { document.documentElement.style.setProperty("--top-h", document.querySelector(".top").offsetHeight + "px"); }
   window.addEventListener("resize", topHeight);
   topHeight();
-  fetch("data.json").then(function (r) {
+  /* this page's build (the shell's meta): its data is asked for under that version, as its scripts are (sw.js) */
+  App.build = (function () {
+    try { var m = document.querySelector('meta[name="build"]'); return m && typeof m.content === "string" ? m.content : ""; }
+    catch (e) { return ""; }
+  })();
+  fetch("data.json" + (App.build ? "?v=" + encodeURIComponent(App.build) : "")).then(function (r) {
     if (!r.ok) throw new Error("data.json answered " + r.status);
     return r.json();
   }).then(function (d) {
+    if (!App.reader) throw new Error("reader.js did not load");
     App.data = d;
-    buildIndex();
-    buildLinker();
+    App.buildIndex();
+    App.buildLinker();
     buildNav();
-    if (App.reader) App.reader.init();
+    App.reader.init();
     wireSearch();
     if (location.hash.indexOf("#/") === 0) {   // an old #/ link: the same page at its real address
       var old = location.hash.slice(2).split("?");
@@ -475,7 +484,15 @@
     });
     window.addEventListener("popstate", route);
     route();
-    // offline reading (sw.js, scoped to this folder): after the page is up, so its storing never slows the first visit
-    if ("serviceWorker" in navigator && window.isSecureContext) navigator.serviceWorker.register("sw.js").catch(function () {});
+    // offline reading (sw.js, scoped to this folder): after the page is up, so its storing never slows the first visit; a
+    // registration or an install that fails says so in the console (the site itself works on)
+    if ("serviceWorker" in navigator && window.isSecureContext) {
+      navigator.serviceWorker.register("sw.js").then(function (reg) {
+        reg.addEventListener("updatefound", function () {
+          var w = reg.installing;
+          if (w) w.addEventListener("statechange", function () { if (w.state === "redundant") console.warn("lorebook: this build's offline copy did not install"); });
+        });
+      }).catch(function (e) { console.warn("lorebook: offline reading is off:", e); });
+    }
   }).catch(function (e) { App.h("<h1>Could not load the lorebook</h1><p class='note'>" + App.esc(e.message) + "</p>"); });
 })();
