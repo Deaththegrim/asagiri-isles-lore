@@ -1,12 +1,12 @@
-/* Asagiri lorebook, offline (his pick 2026-10-28, research/lorebook-improvements-2026-10-28.md): a service worker scoped to the
+/* A lorebook, offline (his pick 2026-10-28, research/lorebook-improvements-2026-10-28.md): a service worker scoped to the
    site's folder. The build writes its version and the files every page needs into the line below
-   (asagiri_lore_site.service_worker): the scripts, style and data under their versioned addresses (app.js?v=<build>), which is how
+   (lorebook_site.service_worker): the scripts, style and data under their versioned addresses (app.js?v=<build>), which is how
    every page asks for them, so a page gets its own build's files whether they come from this store or the network. Each build's
    worker stores its files fetched past the browser's cache and refuses to install unless the stored home page and data.json are
    that build's. Pages come from the network first; offline, the stored home page stands in for any page and the app draws the
    asked one from the stored data. Pictures answer from the store and are refreshed behind it (the newest MAX_IMAGES, per build).
    Every site of the host shares one origin and so one cache storage: this site's stores carry its folder's name. */
-var LOREBOOK = {"version": "97bcd4c2ac1c1a75", "shell": ["./", "app.js?v=97bcd4c2ac1c1a75", "pages.js?v=97bcd4c2ac1c1a75", "bench.js?v=97bcd4c2ac1c1a75", "depth.js?v=97bcd4c2ac1c1a75", "play.js?v=97bcd4c2ac1c1a75", "reader.js?v=97bcd4c2ac1c1a75", "style.css?v=97bcd4c2ac1c1a75", "data.json?v=97bcd4c2ac1c1a75", "manifest.webmanifest", "favicon.ico", "apple-touch-icon.png", "icon-192.png", "icon-512.png"]};
+var LOREBOOK = {"version": "8cce2863a9246756", "shell": ["./", "app.js?v=8cce2863a9246756", "pages.js?v=8cce2863a9246756", "bench.js?v=8cce2863a9246756", "depth.js?v=8cce2863a9246756", "play.js?v=8cce2863a9246756", "reader.js?v=8cce2863a9246756", "style.css?v=8cce2863a9246756", "data.json?v=8cce2863a9246756", "manifest.webmanifest", "favicon.ico", "apple-touch-icon.png", "icon-192.png", "icon-512.png"]};
 var SITE = self.registration.scope.replace(/\/+$/, "").split("/").pop() || "lore";
 var STATIC = SITE + "-static-" + LOREBOOK.version, IMAGES = SITE + "-images-" + LOREBOOK.version, MAX_IMAGES = 400;
 

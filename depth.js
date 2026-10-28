@@ -1,4 +1,4 @@
-/* Asagiri lorebook, depth: the connections web of a person, the era compare, a skill's ladder and the weakness finder.
+/* A lorebook, depth: the connections web of a person, the era compare, a skill's ladder and the weakness finder.
    Pure helpers on App.data plus their markup; pages.js calls them while drawing a page. */
 (function () {
   "use strict";
@@ -83,7 +83,7 @@
   };
 
   D.connectionsHtml = function (n) {
-    var list = D.connections(n).filter(function (c) { return !A.hidden(c.r); });   // people after the war stay covered
+    var list = D.connections(n).filter(function (c) { return !A.hidden(c.r); });   // people the reader keeps covered stay covered
     if (!list.length) return "";
     var text = list.filter(function (c) { return c.names || c.named; });
     var HOW = {both: "they name each other", names: "named in " + n.name + "'s story", named: "names " + n.name, fac: "same faction", home: "same home"};

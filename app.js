@@ -1,4 +1,4 @@
-/* Asagiri lorebook: data, routing, search, links, text. Pages are in pages.js, the bench in bench.js. */
+/* A lorebook: data, routing, search, links, text. Pages are in pages.js, the bench in bench.js. */
 (function () {
   "use strict";
   var App = window.App = {data: null, pages: {}, index: [], byId: {}};
@@ -30,8 +30,8 @@
       return name ? App.esc(name.charAt(0).toUpperCase() + name.slice(1)) + " " + (m > 0 ? "+" : "") + (isFinite(m) ? m : "") : "";
     }).filter(Boolean).join(", ");
   };
-  /* the world's art (asagiri_lore_assets.ART_*, carried in the shell): each folder's picture size, so a picture's box is held
-     before it loads, and the small copies beside the site for cards, lists, galleries and previews */
+  /* the world's art (lorebook_assets.art_json, carried in the shell): each folder's picture size and the pictures whose own
+     size differs (sizes), so a picture's box is held before it loads, and the small copies for cards, lists, galleries and previews */
   App.art = (function () {
     try { var a = JSON.parse(document.getElementById("art").textContent); return a && a.base && a.folders ? a : null; }
     catch (e) { return null; }
@@ -39,7 +39,7 @@
   App.artOf = function (url) {
     var a = App.art, s = String(url || "");
     if (!a || s.indexOf(a.base) !== 0) return null;
-    var path = s.slice(a.base.length), size = a.folders[path.split("/")[0]];
+    var path = s.slice(a.base.length), size = a.folders[path.split("/")[0]] && ((a.sizes || {})[path] || a.folders[path.split("/")[0]]);
     return size && path.indexOf("/") > 0 ? {thumb: a.thumbs + path, w: size[0], h: size[1]} : null;
   };
   /* small: the thumbnail (a card, a list, a preview); a thumbnail that fails falls back to the full picture */
@@ -53,6 +53,10 @@
     var t = e.target;
     if (t && t.tagName === "IMG" && t.dataset.full && t.getAttribute("src") !== t.dataset.full) t.src = t.dataset.full;
   }, true);
+  /* a browser storage key of this site (data.json's site block: each lorebook keeps its readers' marks under its own) */
+  App.key = function (name) { return App.data.site.keys[name]; };
+  /* what the pages say about the world (the site block's text: the world's copy over the kit's) */
+  App.t = function (k) { return App.data.site.text[k]; };
   /* read (no value) or write a per-viewer value; a write answers whether the browser kept it */
   App.tryStore = function (k, v) {
     try {
@@ -106,6 +110,8 @@
   function buildNav() {
     var html = '<a href="./" data-k="">Home</a>', grp = "";
     App.SECTIONS.forEach(function (s) {
+      if (s.k === "bench" && !App.data.craft) return;   // the crafting bench, where the world has one
+      if (App.data.site.off.indexOf(s.k) >= 0) return;   // a section the world has none of
       if (s.g !== grp) { grp = s.g; html += '<div class="grp">' + grp + "</div>"; }
       var n = s.d && App.data[s.d] ? App.count(s.d) : "";
       html += '<a href="' + s.k + '/" data-k="' + s.k + '">' + s.label + (n ? "<span>" + n + "</span>" : "") + "</a>";
@@ -371,14 +377,14 @@
     var key = parts[0] || "";
     nav(key);
     drawer(false);
-    var page = App.pages[key] || function () {   // an address that is no page (GitHub serves 404.html for it)
+    var page = (App.data.site.off.indexOf(key) < 0 && App.pages[key]) || function () {   // no page there (GitHub serves 404.html for it)
       App.h('<div class="crumbs"><a href="./">Home</a></div><h1>Not in the lorebook</h1><p class="lede">Nothing is at this address. ' +
             "Try the search above, or start from the home page.</p>");
     };
     try { page(parts.slice(1).join("/")); }
     catch (e) { App.h("<h1>Something went wrong</h1><p class='note'>" + App.esc(e.message) + "</p>"); throw e; }
     if (!/^map/.test(key)) window.scrollTo(0, 0);
-    document.title = (document.querySelector("main h1") || {}).textContent + " · Asagiri Lorebook";
+    document.title = (document.querySelector("main h1") || {}).textContent + " · " + App.data.site.title;
     onThisPage();
     if (App.reader) App.reader.routed(key, parts.slice(1).join("/"));
     if (routed) document.getElementById("main").focus({preventScroll: true});   // the new page, not the top of the old one

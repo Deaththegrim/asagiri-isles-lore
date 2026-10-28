@@ -1,5 +1,5 @@
 /* The crafting bench and the word checks: the world's own trigger conditions and scripts, run as the engine runs them.
-   Pure functions; asagiri_lore_site_test.py loads this file under node and runs them against the world's data. */
+   Pure functions; lorebook_site_test.py loads this file under node and runs them against the world's data. */
 (function (root) {
   "use strict";
 

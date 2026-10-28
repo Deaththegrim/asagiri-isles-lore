@@ -1,4 +1,4 @@
-/* Asagiri lorebook pages: one renderer per section, list + entry. */
+/* Lorebook pages: one renderer per section, list + entry. */
 (function () {
   "use strict";
   var A = window.App, P = A.pages, esc = A.esc;
@@ -80,35 +80,45 @@
   }
   A.ui = {card: card, crumbs: crumbs, find: find, missing: missing, uniq: uniq, placeLink: placeLink, nameCell: nameCell,   // play.js
           mentioned: mentioned, districtLink: districtLink, districtsAll: districtsAll};
-  function era(region) {
-    return region === "The Asagiri Isles, After the War" ? "After the war" : region === "The Otherworld" ? "Otherworld" :
-      region === "The Asagiri Isles" ? "Before the war" : "Depths and isles";
+  /* a place's era by its region ("" in a world with none), a story start's by its card (the site block, the world's hooks) */
+  function hasEras() { return Object.keys(A.data.site.eras.regions).length > 0; }
+  function era(region) { return hasEras() ? A.data.site.eras.regions[region] || A.data.site.eras.other : ""; }
+  function startEra(r) {
+    var E = A.data.site.startEras, hit = E.rules.filter(function (x) { return new RegExp(x[0]).test(r.info); })[0];
+    return hit ? hit[1] : E.other;
   }
+  function bookLink(name) {   // a guide book the pages cite, linked when the world has it
+    var b = name && A.byName("books", name);
+    return b ? '<a href="' + A.href("mechanics", b.id) + '">' + esc(b.name) + "</a>" : esc(name || "");
+  }
+  A.bookLink = bookLink;   // play.js
 
   /* ---------- home ---------- */
   P[""] = function () {
-    var d = A.data, isles = regionOf("The Asagiri Isles");
+    var d = A.data, isles = regionOf(d.site.main);
     var tiles = [["people", A.count("npcs"), "people"], ["places", d.locations.length, "places"], ["districts", Object.keys(districtsAll()).length, "districts"], ["factions", d.factions.length, "factions"],
                  ["creatures", d.creatures.length, "creatures"], ["items", d.items.length, "items"], ["abilities", d.abilities.length, "abilities"],
                  ["traits", d.traits.length, "traits"], ["lore", d.lore.length, "lore entries"], ["mechanics", d.books.length, "guide books"],
-                 ["say", d.say.length, "typed actions"], ["starts", d.starts.length, "story starts"], ["music", d.music.length, "tracks"]];
+                 ["say", d.say.length, "typed actions"], ["starts", d.starts.length, "story starts"], ["music", d.music.length, "tracks"]]
+      .filter(function (t) { return d.site.off.indexOf(t[0]) < 0; });   // a section the world has none of
     var some = function (list, n) {   // n at random, no repeats
       list = list.slice(); var out = [];
       while (list.length && out.length < n) out.push(list.splice(Math.floor(Math.random() * list.length), 1)[0]);
       return out;
     };
     var people = some(uniq(d.npcs.filter(function (n) { return n.img && !A.hidden(n); })), 6);
-    var scenic = d.locations.filter(function (l) { return l.img && l.region === "The Asagiri Isles" && l.kind === "complex"; });
+    var scenic = d.locations.filter(function (l) { return l.img && l.region === d.site.main && l.kind === "complex"; });
     var hero = some(scenic, 1)[0], places = some(scenic.filter(function (l) { return l !== hero; }), 4);
     var all = districtsAll(), dnames = Object.keys(all).sort();
     var sl = function (n) { return n.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""); };
-    var tools = [["say/", "What to say", "The exact words that set off travel, bounties, crafting, your home and ship."],
+    var tools = [["say/", "What to say", A.t("homeSay")],
                  ["bench/", "Crafting bench", "Pick a recipe and get the lines to type, checked against the world's own scripts."],
                  ["planner/", "Character planner", "Every creator pick with its unlocks; compare two builds side by side."],
-                 ["map/" + (isles ? isles.id + "/" : ""), "The map", "Twelve districts on one map: find a place, show one district."]];
+                 ["map/" + (isles ? isles.id + "/" : ""), "The map", A.t("homeMap")]]
+      .filter(function (t) { return t[0] !== "bench/" || d.craft; });   // the crafting bench, where the world has one
     var intro = isles ? A.first(isles.info.replace(/^\[[^\]]*\]\s*/, ""), 260) : "";
     A.h('<section class="banner"' + (hero ? "" : ' data-plain="1"') + ">" + (hero ? A.img(hero.img, "").replace('loading="lazy" ', "") : "") +
-      '<div class="bannertext"><h1>The Asagiri Isles</h1><p>' + esc(intro) + '</p><div class="bannerlinks">' +
+      '<div class="bannertext"><h1>' + esc(d.site.world) + "</h1><p>" + esc(intro) + '</p><div class="bannerlinks">' +
       tools.map(function (t) { return '<a href="' + t[0] + '">' + esc(t[1]) + "</a>"; }).join("") + "</div>" +
       (hero ? '<a class="pictured" href="' + A.href("places", hero.id) + '">Pictured: ' + esc(hero.name) + (hero.district ? ", " + esc(hero.district) : "") + "</a>" : "") +
       "</div></section>" +
@@ -116,12 +126,12 @@
       "<h2>Start here</h2><div class='grid wide'>" + tools.map(function (t) {
         return '<a class="card tool" href="' + t[0] + '"><div class="body"><div class="t">' + esc(t[1]) + '</div><div class="x">' + esc(t[2]) + "</div></div></a>";
       }).join("") + "</div>" +
-      "<h2>The districts</h2><div class='dchips'>" + dnames.map(function (n) {
+      (dnames.length ? "<h2>The districts</h2><div class='dchips'>" + dnames.map(function (n) {
         return '<a href="districts/' + sl(n) + '/"' + accent(n) + "><i></i>" + esc(n) + "</a>";
-      }).join("") + "</div>" +
+      }).join("") + "</div>" : "") +
       (places.length ? "<h2>Places to visit</h2><div class='grid wide'>" + places.map(function (l) { return card("places", l, esc(l.district || ""), true); }).join("") + "</div>" : "") +
       (people.length ? "<h2>People you might meet</h2><div class='grid'>" + people.map(function (n) { return card("people", n, esc(n.type)); }).join("") + "</div>" : "") +
-      (isles && isles.map ? '<h2>The map</h2><a class="hero" href="map/' + isles.id + '/">' + A.img(isles.map, "The Asagiri Isles map") + "</a>" : "") +
+      (isles && isles.map ? '<h2>The map</h2><a class="hero" href="map/' + isles.id + '/">' + A.img(isles.map, isles.name + " map") + "</a>" : "") +
       '<p class="note" style="margin-top:32px">Everything here is what a player can learn at the table: no one\'s secrets, no hidden places. ' +
       "Built from the world file; data " + esc(d.sha || "") + ".</p>");
   };
@@ -130,7 +140,7 @@
   P.people = function (id) {
     if (id) return person(id);
     var seen = {}, rows = A.data.npcs.filter(function (n) { return seen[n.name] ? false : (seen[n.name] = 1); });
-    A.listPage({title: "People", rows: rows, lede: "Everyone the isles introduce you to, with where to find them. Someone the war changed has one page with both eras.",
+    A.listPage({title: "People", rows: rows, lede: esc(A.t("ledePeople")),
       facet: {district: function (r) { var p = A.byName("locations", r.location); return p ? p.district : ""; },
               faction: function (r) { return r.faction; }, tier: function (r) { return r.tier; }, type: function (r) { return r.type; }},
       names: {district: "District", faction: "Faction", tier: "Tier", type: "Type"},
@@ -159,7 +169,7 @@
       A.infobox(n.name, n.img || (versions.filter(function (o) { return o.img; })[0] || {}).img, [["Type", esc(n.type)], ["Gender", esc(n.gender)], ["Tier", esc(n.tier)], ["Level", n.level],
         ["Faction", n.faction ? A.nameLink("factions", n.faction) : ""], ["Home", n.location ? placeLink(n.location, n.area) : ""],
         ["District", place && place.district ? districtLink(place.district) : ""], ["Era", place ? era(place.region) : ""],
-        ["Map", place && regionOf(place.region) ? '<a href="map/' + regionOf(place.region).id + "/?pin=" + place.id + '">Show on map</a>' : ""]]) +
+        ["Map", place && regionOf(place.region) && regionOf(place.region).map ? '<a href="map/' + regionOf(place.region).id + "/?pin=" + place.id + '">Show on map</a>' : ""]]) +
       "</div>");
     mentioned(n.name, "people", n.id);
   }
@@ -167,9 +177,12 @@
   /* ---------- places ---------- */
   P.places = function (id) {
     if (id) return placePage(id);
-    var facet = {era: function (r) { return era(r.region); }, district: function (r) { return r.district; }, kind: function (r) { return r.kind; }};
+    var facet = {};
+    if (hasEras()) facet.era = function (r) { return era(r.region); };
+    facet.district = function (r) { return r.district; };
+    facet.kind = function (r) { return r.kind; };
     if (A.been.count()) facet.been = function (r) { return A.been.has(r.id) ? "Been there" : "Not yet"; };   // only once the reader marks a place
-    A.listPage({title: "Places", rows: A.data.locations, lede: "Towns, shrines, wilds and depths, before and after the war.",
+    A.listPage({title: "Places", rows: A.data.locations, lede: esc(A.t("ledePlaces")),
       facet: facet, names: {era: "Era", district: "District", kind: "Kind", been: "Been there"},
       card: function (r) { return card("places", r, esc(r.district || r.region) + (levels(r.levels) ? " · lv " + levels(r.levels) : ""), true); }});
   };
@@ -208,13 +221,28 @@
   }
 
   /* ---------- map ---------- */
+  /* a region with no map picture: its places as a list, as its pre-rendered page has them; a world with no map at all: the
+     regions, each its own page */
+  function mapless(r) {
+    if (!r) {
+      A.h(crumbs([["Map"]]) + "<h1>Map</h1><div class='grid wide'>" + A.visible(A.data.regions).map(function (x) { return card("map", x, ""); }).join("") + "</div>");
+      return;
+    }
+    var places = A.data.locations.filter(function (l) { return l.region === r.name; });
+    A.h(crumbs([["Map", "map/"], [r.name]]) + "<h1>" + esc(r.name) + '</h1><div class="prose">' + A.prose(r.info, r.name) +
+      "<h2>Places in this region</h2></div><div class='grid'>" + places.map(function (l) {
+        return card("places", l, esc(l.district || l.kind) + (levels(l.levels) ? " · lv " + levels(l.levels) : ""), true);
+      }).join("") + "</div>");
+  }
   P.map = function (id) {
+    var asked = id ? A.data.regions.filter(function (r) { return r.id === id; })[0] : null;
     var regs = A.data.regions.filter(function (r) { return r.map && A.data.locations.some(function (l) { return l.region === r.name; }); });
-    var reg = regs.filter(function (r) { return r.id === id; })[0] || regs.filter(function (r) { return r.name === "The Asagiri Isles"; })[0] || regs[0];
+    if ((asked && !asked.map) || !regs.length) return mapless(asked && !asked.map ? asked : null);
+    var reg = regs.filter(function (r) { return r.id === id; })[0] || regs.filter(function (r) { return r.name === A.data.site.main; })[0] || regs[0];
     var pinId = A.param("pin"), distPick = A.param("district");
     var places = A.data.locations.filter(function (l) { return l.region === reg.name; });
     var dists = {}; places.forEach(function (p) { if (p.district) dists[p.district] = 1; });
-    var main = ["The Asagiri Isles", "The Asagiri Isles, After the War", "The Otherworld"];
+    var main = A.data.site.mapOrder;
     var opts = regs.filter(function (r) { return r === reg || !A.hidden(r); }).sort(function (a, b) {
       var ia = main.indexOf(a.name), ib = main.indexOf(b.name);
       return (ia < 0 ? 9 : ia) - (ib < 0 ? 9 : ib) || a.name.localeCompare(b.name);
@@ -422,8 +450,7 @@
       mentioned(c.name, "creatures", c.id);
       return;
     }
-    A.listPage({title: "Creatures", rows: A.data.creatures, wide: true, lede: "Yokai, beasts, spirits and the kinds of people the isles send against you. " +
-      "Pick a damage type to see what it hurts.",
+    A.listPage({title: "Creatures", rows: A.data.creatures, wide: true, lede: esc(A.t("ledeCreatures")) + " Pick a damage type to see what it hurts.",
       facet: {weak: function (r) { return r.weak; }, resist: function (r) { return r.resist; }}, names: {weak: "Weak to", resist: "Resists"},
       card: function (r) { return card("creatures", r, (r.weak.length ? "weak to " + esc(r.weak.join(", ")) : "")); },
       table: [{h: "Creature", v: function (r) { return r.name; }, html: nameCell("creatures")},
@@ -440,7 +467,7 @@
       A.h(crumbs([["Lore", "lore/"], [l.name]]) + "<h1>" + esc(l.name) + '</h1><div class="prose">' + A.prose(l.info, l.name) + "</div>");
       return;
     }
-    A.listPage({title: "Lore", rows: A.data.lore, wide: true, lede: "History, powers, society, places and the folk tales the isles tell.",
+    A.listPage({title: "Lore", rows: A.data.lore, wide: true, lede: esc(A.t("ledeLore")),
       card: function (r) { return card("lore", r, ""); }});
   };
 
@@ -456,14 +483,14 @@
       var b = find("books", id);
       if (!b) return missing("Mechanics");
       var acts = bookSay()[b.name] || [];
-      var bench = b.name === "The Craftsman's Primer" || b.name === "The Isles Recipe Book";
+      var bench = !!A.data.craft && A.data.site.books.bench.indexOf(b.name) >= 0;
       A.h(crumbs([["Mechanics", "mechanics/"], [b.name]]) + "<h1>" + esc(b.name) + '</h1><div class="prose">' + A.prose(b.info, b.name) +
         (acts.length || bench ? "<h2>What to say</h2><ul>" + (bench ? '<li><a href="bench/">The crafting bench</a>: build the exact line and see what the forge says</li>' : "") +
           acts.map(function (f) { return '<li><a href="say/' + f.key + '/">' + esc(f.label) + "</a></li>"; }).join("") + "</ul>" : "") +
         '<p class="note">Every new character carries this book in the world.</p></div>');
       return;
     }
-    A.h(crumbs([["Mechanics"]]) + '<h1>Mechanics</h1><p class="lede">How the isles work, as the guide books every new character carries explain it. ' +
+    A.h(crumbs([["Mechanics"]]) + '<h1>Mechanics</h1><p class="lede">' + esc(A.t("ledeMechanics")) + " " +
       'Each book links to the lines that set its system off.</p><div class="grid wide">' +
       A.data.books.map(function (b) { return card("mechanics", b, (bookSay()[b.name] || []).length ? (bookSay()[b.name].length + " typed actions") : ""); }).join("") +
       '</div><h2>Tables</h2><ul><li><a href="skills/">Skills</a>: what each art covers and how hard things are</li><li><a href="traits/">Traits</a>: every creation pick and what it gives</li>' +
@@ -472,7 +499,7 @@
 
   /* ---------- skills, traits, abilities, items ---------- */
   P.skills = function () {
-    A.h(crumbs([["Skills"]]) + '<h1>Skills</h1><p class="lede">The isles\' arts. Each names what it covers, what it does not, and examples by difficulty.</p>' +
+    A.h(crumbs([["Skills"]]) + '<h1>Skills</h1><p class="lede">' + esc(A.t("ledeSkills")) + " Each names what it covers, what it does not, and examples by difficulty.</p>" +
       A.data.skills.map(function (s) {
         return '<h2 class="cap" id="' + s.id + '" data-toc="' + esc(s.name) + '">' + esc(s.name) + ' <span class="tag">' + esc(s.type) + '</span> <span class="tag">' + esc(s.attribute) + '</span></h2><div class="prose">' +
           A.prose(s.info) + A.depth.ladderHtml(s.name) + "</div>";
@@ -541,11 +568,12 @@
     }
     // the facets read the start's own card line ("PARTY · 2-5 players · Saikai Free Port · guided") and danger line
     var head = function (r) { return r.info.split("\n")[0].split(" · "); };
-    A.listPage({title: "Story starts", rows: A.data.starts, wide: true, lede: "Where a story can open, and who is in the first scene.",
-      facet: {who: function (r) { return /^PARTY/.test(r.info) ? "Party" : "Solo"; },
+    var sf = {who: function (r) { return /^PARTY/.test(r.info) ? "Party" : "Solo"; },
               district: function (r) { var h = head(r); return h.length > 2 ? h[h.length - 2] : ""; },
-              danger: function (r) { var m = r.info.match(/Danger: \S* ?(\w+)/); return m ? m[1] : ""; },
-              era: function (r) { return /After the War/.test(r.info) ? "After the war" : /Otherworld|Training Ground/.test(r.info) ? "Otherworld" : "Before the war"; }},
+              danger: function (r) { var m = r.info.match(/Danger: \S* ?(\w+)/); return m ? m[1] : ""; }};
+    if (A.data.site.startEras.rules.length) sf.era = startEra;
+    A.listPage({title: "Story starts", rows: A.data.starts, wide: true, lede: "Where a story can open, and who is in the first scene.",
+      facet: sf,
       names: {who: "Who", district: "District", danger: "Danger", era: "Era"},
       card: function (r) { return card("starts", r, esc(head(r).slice(0, 2).join(" · "))); }});
   };
@@ -556,7 +584,7 @@
   P.music = function () {
     var by = {};
     A.data.music.forEach(function (t) { (by[t.mood] = by[t.mood] || []).push(t); });
-    A.h(crumbs([["Music"]]) + '<h1>Music</h1><p class="lede">The soundtrack the isles play, by the mood of the scene.</p><div id="music">' +
+    A.h(crumbs([["Music"]]) + '<h1>Music</h1><p class="lede">' + esc(A.t("ledeMusic")) + '</p><div id="music">' +
       Object.keys(by).sort().map(function (m) {
         return "<h2>" + esc(m.replace(/_/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2")) + '</h2><p><button type="button" class="playall">Play all ' +
           by[m].length + '</button></p><div class="grid wide">' + by[m].map(function (t) {
@@ -609,27 +637,30 @@
     var all = districtsAll(), names = Object.keys(all).sort();
     var sl = function (n) { return n.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""); };
     var lore = function (n) { return A.byName("lore", "District: " + n); };
-    var isles = regionOf("The Asagiri Isles");
+    var site = A.data.site, isles = regionOf(site.main);
+    // a district's hub lore opens "<District> is a district of <the world>. ": the card shows what follows
+    var hubLine = new RegExp("^.*? is a district of " + site.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\. ");
     if (!id) {
-      var marked = A.been.count(), prog = A.been.progress(A.data.locations.filter(function (l) { return l.region === "The Asagiri Isles"; }));
-      A.h(crumbs([["Districts"]]) + '<h1>Districts</h1><p class="lede">The isles are twelve districts on one map, from the gentle plain around ' +
-        'Miyako to the ice of Hyoga Reach. Each one\'s level band covers everything in it.</p><div class="grid wide">' +
+      var marked = A.been.count(), prog = A.been.progress(A.data.locations.filter(function (l) { return l.region === site.main; }));
+      A.h(crumbs([["Districts"]]) + '<h1>Districts</h1><p class="lede">' + esc(A.t("ledeDistricts")) + " " +
+        'Each one\'s level band covers everything in it.</p><div class="grid wide">' +
         names.map(function (n) {
-          var places = all[n].filter(function (l) { return l.region === "The Asagiri Isles"; });
+          var places = all[n].filter(function (l) { return l.region === site.main; });
           var hub = places.filter(function (l) { return l.img; })[0] || {};
           var lv = places.map(function (l) { return l.levels || []; }).reduce(function (a, b) { return a.concat(b); }, []);
           var band = lv.length ? Math.min.apply(null, lv) + "-" + Math.max.apply(null, lv) : "";
           var lr = lore(n);
           return '<a class="card dc" href="districts/' + sl(n) + '/"' + accent(n) + '><div class="pic land">' + A.img(hub.img, n, "", true) + '</div><div class="body"><div class="t">' +
             esc(n) + '</div><div class="s">' + places.length + " places" + (band ? " · level " + band : "") + (marked ? " · been to " + (prog[n] || [0])[0] : "") + '</div><div class="x">' +
-            esc(lr ? A.first(lr.info.replace(/^.*? is a district of the Asagiri Isles\. /, ""), 140) : "") + "</div></div></a>";
+            esc(lr ? A.first(lr.info.replace(hubLine, ""), 140) : "") + "</div></div></a>";
         }).join("") + "</div>");
       return;
     }
     var name = names.filter(function (n) { return sl(n) === id; })[0];
     if (!name) return missing("Districts");
-    var before = all[name].filter(function (l) { return l.region === "The Asagiri Isles"; });
-    var after = all[name].filter(function (l) { return l.region === "The Asagiri Isles, After the War"; });
+    var before = all[name].filter(function (l) { return l.region === site.main; });
+    var after = site.lateRegion ? all[name].filter(function (l) { return l.region === site.lateRegion; }) : [];
+    var others = all[name].filter(function (l) { return l.region !== site.main && l.region !== site.lateRegion; });   // a district over more regions
     var shown = all[name].filter(function (l) { return !A.hidden(l); }), lateHidden = after.length && A.hidden(after[0]);
     var here = {}; shown.forEach(function (l) { here[l.name] = 1; });
     var people = uniq(A.data.npcs.filter(function (n) { return here[n.location] && !A.hidden(n); }));
@@ -637,13 +668,14 @@
     var mine = A.been.count() ? A.been.progress(shown)[name] : null;
     var lr = lore(name);
     A.h(crumbs([["Districts", "districts/"], [name]]) + '<h1 class="dh"' + accent(name) + ">" + esc(name) + '</h1><div class="prose">' + (lr ? A.prose(lr.info, name) : "") +
-      "</div><p>" + (isles ? '<a href="map/' + isles.id + "/?district=" + encodeURIComponent(name) + '">Show it on the map</a> · ' : "") +
+      "</div><p>" + (isles && isles.map ? '<a href="map/' + isles.id + "/?district=" + encodeURIComponent(name) + '">Show it on the map</a> · ' : "") +
       '<a href="people/?district=' + encodeURIComponent(name) + '">Everyone here</a></p>' +
       (mine ? '<p class="beenbar"><span>Been to ' + mine[0] + " of " + mine[1] + ' places here</span><meter min="0" max="' + mine[1] + '" value="' + mine[0] +
         '" aria-label="Places of ' + esc(name) + ' you have been to"></meter></p>' : "") +
-      "<h2>Places before the war</h2><div class='grid'>" + before.map(function (l) { return card("places", l, esc(l.kind) + (levels(l.levels) ? " · lv " + levels(l.levels) : ""), true); }).join("") + "</div>" +
-      (lateHidden ? "<h2>Places after the war</h2><p>" + A.spoil.listNote(after.length, "places") + "</p>" :
-        after.length ? "<h2>Places after the war</h2><div class='grid'>" + after.map(function (l) { return card("places", l, esc(l.kind) + (levels(l.levels) ? " · lv " + levels(l.levels) : ""), true); }).join("") + "</div>" : "") +
+      "<h2>" + esc(A.t("placesBefore")) + "</h2><div class='grid'>" + before.map(function (l) { return card("places", l, esc(l.kind) + (levels(l.levels) ? " · lv " + levels(l.levels) : ""), true); }).join("") + "</div>" +
+      (lateHidden ? "<h2>" + esc(A.t("placesAfter")) + "</h2><p>" + A.spoil.listNote(after.length, "places") + "</p>" :
+        after.length ? "<h2>" + esc(A.t("placesAfter")) + "</h2><div class='grid'>" + after.map(function (l) { return card("places", l, esc(l.kind) + (levels(l.levels) ? " · lv " + levels(l.levels) : ""), true); }).join("") + "</div>" : "") +
+      (others.length ? "<h2>" + esc(A.t("placesElsewhere")) + "</h2><div class='grid'>" + others.map(function (l) { return card("places", l, esc(l.region) + (levels(l.levels) ? " · lv " + levels(l.levels) : ""), true); }).join("") + "</div>" : "") +
       (Object.keys(facs).length ? "<h2>Factions here</h2><div class='grid wide'>" + Object.keys(facs).sort().map(function (f) {
         var r = A.byName("factions", f); return r ? card("factions", r, esc(r.type)) : "";
       }).join("") + "</div>" : "") +
@@ -657,9 +689,9 @@
     if (!key) {
       var by = {};
       fams.forEach(function (f) { (by[f.system] = by[f.system] || []).push(f); });
-      A.h(crumbs([["What to say"]]) + '<h1>What to say</h1><p class="lede">The lines that set off the isles\' systems. Each one is read off the world\'s own ' +
-        "triggers and checked against their word checks, so the words are right; where a line also needs the narrator to agree the moment is real, it says so. " +
-        'Crafting has its own <a href="bench/">bench</a>.</p>' +
+      A.h(crumbs([["What to say"]]) + '<h1>What to say</h1><p class="lede">' + esc(A.t("ledeSay")) + " Each one is read off the world\'s own " +
+        "triggers and checked against their word checks, so the words are right; where a line also needs the narrator to agree the moment is real, it says so." +
+        (A.data.craft ? ' Crafting has its own <a href="bench/">bench</a>.' : "") + "</p>" +
         Object.keys(by).map(function (s) {
           return "<h2>" + esc(s) + "</h2><div class='grid wide'>" + by[s].map(function (f) {
             var t = f.triggers[0];
@@ -712,20 +744,20 @@
   };
 
   /* ---------- the crafting bench ---------- */
-  var BENCH_KEY = "asagiri-bench-ledger";
   P.bench = function () {
     var C = A.data.craft;
-    var ledger = A.tryStore(BENCH_KEY) || {};
+    if (!C) return missing("Crafting bench");   // a world with no crafting bench
+    var ledger = A.tryStore(A.key("bench")) || {};
     function save(storage) {
       ledger = Bench.own(C, storage);
-      return A.tryStore(BENCH_KEY, ledger);
+      return A.tryStore(A.key("bench"), ledger);
     }
     var NOSAVE = '<p class="warn">This browser will not keep the ledger (storage is blocked): it lasts until you leave the page.</p>';
     var stations = A.data.locations;
     var QUAL = ["Base", "Fine", "Superior", "Master-made", "Named"];
-    A.h(crumbs([["Crafting bench"]]) + '<h1>Crafting bench</h1><p class="lede">Build the exact line to type, then run it through the isles\' own crafting ' +
-      'triggers, the same code the game runs, to see what the narrator will be told. Rules: <a href="mechanics/the-craftsman-s-primer/">The Craftsman\'s Primer</a>, ' +
-      'recipes: <a href="mechanics/the-isles-recipe-book/">The Isles Recipe Book</a>.</p><div class="cols"><div>' +
+    var BB = A.data.site.books.bench;
+    A.h(crumbs([["Crafting bench"]]) + '<h1>Crafting bench</h1><p class="lede">' + esc(A.t("benchLede")) + " Rules: " + bookLink(BB[0]) + ", " +
+      "recipes: " + bookLink(BB[1]) + '.</p><div class="cols"><div>' +
       '<div class="form"><label for="bact">I want to</label><select id="bact"><option value="craft">Craft a recipe</option><option value="design">Design a new recipe</option>' +
       '<option value="upgrade">Upgrade something I made</option></select>' +
       '<label for="brec" data-for="craft upgrade">Recipe</label><select id="brec" data-for="craft upgrade"></select>' +
@@ -849,7 +881,6 @@
 (function () {
   "use strict";
   var A = window.App, esc = A.esc;
-  var KEY = "asagiri-planner";
 
   /* a trait shows when nothing unlocks it or one of its unlockers is picked, and nothing picked excludes it (either way round) */
   function open(t, picked) {
@@ -879,7 +910,7 @@
   A.pages.planner = function () {
     var cats = A.data.categories, C = A.data.creation;
     // two builds, A and B, side by side in "Compare"; a shared link carries both (?pick= and ?vs=)
-    var stored = A.tryStore(KEY) || {};
+    var stored = A.tryStore(A.key("planner")) || {};
     var builds = stored.A || stored.B ? {A: stored.A || {}, B: stored.B || {}} : {A: stored, B: {}};   // an older save was one build
     var parse = function (str) {
       var out = {};
@@ -888,10 +919,9 @@
     };
     if (A.param("pick")) builds = {A: parse(A.param("pick")), B: A.param("vs") ? parse(A.param("vs")) : {}};
     var slot = "A", mode = "edit", picked = builds.A;
-    A.h('<div class="crumbs"><a href="./">Home</a> / Character planner</div><h1>Character planner</h1><p class="lede">Every pick the ' +
-      "creator offers, in its order, with the same unlocks and exclusions: choose a Tradition and its Lineages open, and so on. The " +
-      'totals add up what your picks give. Rules: <a href="mechanics/paths-and-ladders/">Paths and Ladders</a>, ' +
-      '<a href="mechanics/how-fighting-works/">How Fighting Works</a>.</p><nav class="tabs" aria-label="Builds" id="pslots">' +
+    var rules = A.data.site.books.planner.map(A.bookLink);
+    A.h('<div class="crumbs"><a href="./">Home</a> / Character planner</div><h1>Character planner</h1><p class="lede">' + esc(A.t("plannerLede")) +
+      (rules.length ? " Rules: " + rules.join(", ") + "." : "") + '</p><nav class="tabs" aria-label="Builds" id="pslots">' +
       '<a href="planner/" data-slot="A">Build A</a><a href="planner/" data-slot="B">Build B</a><a href="planner/" data-slot="cmp">Compare A and B</a></nav>' +
       '<div class="article"><div id="pcats"></div>' +
       '<aside class="infobox" id="ptotal"></aside></div>');
@@ -910,7 +940,7 @@
     function draw() {
       var dropped = prune(picked);
       builds[slot] = picked;
-      A.tryStore(KEY, builds);
+      A.tryStore(A.key("planner"), builds);
       document.querySelectorAll("#pslots a").forEach(function (t) {
         var on = mode === "compare" ? t.dataset.slot === "cmp" : t.dataset.slot === slot;
         t.classList.toggle("on", on);

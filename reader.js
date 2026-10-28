@@ -1,4 +1,4 @@
-/* Asagiri lorebook, the reader's own layer (his picks 2026-10-28, research/lorebook-improvements-2026-10-28.md): the after-the-war
+/* A lorebook, the reader's own layer (his picks 2026-10-28, research/lorebook-improvements-2026-10-28.md): the after-the-war
    switch, previews of linked entries on hover, and "been there" marks on places. What a reader sets stays in their own browser
    (App.tryStore); nothing is sent anywhere. */
 (function () {
@@ -6,11 +6,12 @@
   var A = window.App, esc = A.esc;
 
   /* ---------- after the war: covered until the reader chooses to see it (spoiler practice: warn, cover, one switch) ---------- */
-  var S = A.spoil = {key: "asagiri-lore:after-war", late: null};   // the key the shell's head script also reads
+  var S = A.spoil = {key: null, late: null};   // key: the site's afterWar key, the one the shell's head script also reads
   var opened = [];   // records shown once on their own page this visit ("Show this page")
-  /* what is after the war comes with the data ({section: [ids]}, asagiri_lore_data.late): the same set the pre-rendered pages
+  /* what is after the war comes with the data ({section: [ids]}, lorebook_data.late): the same set the pre-rendered pages
      cover before this script runs */
   S.init = function () {
+    S.key = A.key("afterWar");
     var late = new Set(), L = A.data.late || {};
     Object.keys(L).forEach(function (sec) {
       var ids = {};
@@ -31,8 +32,9 @@
     A.route();
   };
   /* a list's note: how many after-the-war entries it left out ("12 places after the war, hidden"), with the switch */
+  function words() { return A.data.site.late; }   // the switch's words (the site block); null in a world with no switch
   S.listNote = function (n, what) {
-    return n ? '<span class="note spoilnote">' + n + " " + esc(what) + ' after the war, hidden. <button type="button" class="linkish" data-spoil="show">Show them</button></span>' : "";
+    return n ? '<span class="note spoilnote">' + n + " " + esc(what) + " " + esc(words().hidden) + '. <button type="button" class="linkish" data-spoil="show">Show them</button></span>' : "";
   };
   function veil(r, isMap) {
     var main = document.getElementById("main"), h1 = main.querySelector("h1");
@@ -40,9 +42,9 @@
     var box = document.createElement("div");
     box.className = "veil";
     box.setAttribute("role", "note");
-    box.innerHTML = "<p><b>After the war.</b> " + (isMap ? "This map shows" : "This page is about") +
-      " the isles after the Great War. Pages about what follows the war stay covered until you choose to see them.</p>" +
-      '<p><button type="button" class="primary" data-spoil="page">Show this page</button> <button type="button" data-spoil="show">Show everything after the war</button></p>';
+    var w = words();
+    box.innerHTML = "<p><b>" + esc(w.title) + ".</b> " + (isMap ? "This map shows" : "This page is about") + " " + esc(w.about) + ". " + esc(w.rest) + "</p>" +
+      '<p><button type="button" class="primary" data-spoil="page">Show this page</button> <button type="button" data-spoil="show">' + esc(w.showAll) + "</button></p>";
     // the rest of the page stays in it (search engines read it) but is covered and out of reach of the keyboard and screen readers
     [].slice.call(main.children).forEach(function (el) {
       if (el === h1 || el.classList.contains("crumbs")) return;
@@ -59,8 +61,8 @@
   A.preview = function (kind, r) {   // the card's html (pure: the gate runs it over every entry)
     var label = A.LABEL[kind] || "", sub = r.type || r.district || r.category || "";
     if (S.hides(r)) {
-      return '<div class="pv-body"><div class="pv-k">' + esc(label) + " · after the war</div><div class=\"pv-t\">" + esc(r.name) +
-        '</div><p>Covered: you have not chosen to see what follows the war.</p></div>';
+      return '<div class="pv-body"><div class="pv-k">' + esc(label) + " · " + esc(words().tag) + "</div><div class=\"pv-t\">" + esc(r.name) +
+        "</div><p>" + esc(words().covered) + "</p></div>";
     }
     var text = A.first(r.info, 220);
     return (r.img ? '<div class="pv-pic' + (kind === "people" ? " tall" : "") + '">' + A.img(r.img, "", "", true).replace('loading="lazy" ', "") + "</div>" : "") +
@@ -149,7 +151,7 @@
   }
 
   /* ---------- been there: a reader's own marks on places, with progress per district (MapGenie's found-it marks) ---------- */
-  var B = A.been = {key: "asagiri-lore:been", changed: null};
+  var B = A.been = {key: null, changed: null};   // key: the site's been key (set by A.reader.init)
   var marks = null, kept = true;
   B.all = function () {
     if (!marks) { var v = A.tryStore(B.key); marks = v && typeof v === "object" && !Array.isArray(v) ? v : {}; }
@@ -192,13 +194,16 @@
   /* ---------- wiring ---------- */
   A.reader = {
     init: function () {
+      B.key = A.key("been");
       S.init();
-      var side = document.getElementById("side"), lab = document.createElement("label");
-      lab.className = "navsw";
-      lab.innerHTML = '<input type="checkbox" id="spoilsw"' + (S.shown() ? " checked" : "") + "> Show after the war" +
-        '<span class="note" id="spoilnote" aria-live="polite"></span>';
-      side.appendChild(lab);
-      document.getElementById("spoilsw").addEventListener("change", function () { S.set(this.checked); });
+      if (words()) {   // the switch, in a world that has one
+        var side = document.getElementById("side"), lab = document.createElement("label");
+        lab.className = "navsw";
+        lab.innerHTML = '<input type="checkbox" id="spoilsw"' + (S.shown() ? " checked" : "") + "> " + esc(words().switch) +
+          '<span class="note" id="spoilnote" aria-live="polite"></span>';
+        side.appendChild(lab);
+        document.getElementById("spoilsw").addEventListener("change", function () { S.set(this.checked); });
+      }
       document.addEventListener("click", function (e) {
         var s = e.target.closest("[data-spoil]");
         if (s) {
