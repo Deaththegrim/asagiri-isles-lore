@@ -525,8 +525,11 @@
         A.infobox(t.name, null, [["Category", esc(t.category)], ["Attributes", kv(t.attributes)], ["Skills", kv(t.skills)], ["Resources", kv(t.resources)],
           ["Abilities", t.abilities.map(function (a) { var r = A.byName("abilities", a); return r ? '<a href="' + A.href("abilities", r.id) + '">' + esc(a) + "</a>" : esc(a); }).join(", ")],
           ["Starts with", t.startingItems.map(function (i) { return esc(i.item || i); }).join(", ")],
-          ["Needs", t.unlockedBy.map(function (u) { var r = A.data.traits.filter(function (x) { return x.id === u || x.name === u; })[0]; return r ? '<a href="' + A.href("traits", r.id) + '">' + esc(r.name) + "</a>" : esc(u); }).join(" or ")],
-          ["Not with", t.excludedBy.map(esc).join(", ")]]) + "</div>");
+          ["Needs", t.unlockedBy.map(function (u) {
+            var r = A.data.traits.filter(function (x) { return x.id === u || x.name === u; })[0], s = r ? null : A.byName("starts", u);
+            return r ? '<a href="' + A.href("traits", r.id) + '">' + esc(r.name) + "</a>" : s ? 'the start <a href="' + A.href("starts", s.id) + '">' + esc(u) + "</a>" : esc(u);
+          }).join(" or ")],
+          ["Not with", t.excludedBy.map(function (u) { var s = A.byName("starts", u); return s ? 'the start <a href="' + A.href("starts", s.id) + '">' + esc(u) + "</a>" : esc(u); }).join(", ")]]) + "</div>");
       return;
     }
     A.listPage({title: "Traits", rows: A.data.traits, wide: true, lede: "Every pick in character creation and the traits a story gives you.",
@@ -882,6 +885,7 @@
   "use strict";
   var A = window.App, esc = A.esc;
 
+  var START = "@start";   // a build's story start (picked[START]): a pick's unlockedBy / excludedBy may name one, as the creator's do
   /* a trait shows when nothing unlocks it or one of its unlockers is picked, and nothing picked excludes it (either way round) */
   function open(t, picked) {
     var names = Object.keys(picked).map(function (c) { return picked[c]; });
@@ -905,7 +909,25 @@
     });
     return out;
   }
-  A.planner = {open: open, totals: totals};   // the gate runs these under node
+  /* a pick whose unlocker went away is dropped, and that can drop others; the story start is no pick and stays */
+  function prune(p) {
+    var changed = true, dropped = [];
+    while (changed) {
+      changed = false;
+      Object.keys(p).forEach(function (c) {
+        if (c === START) return;
+        var t = A.byName("traits", p[c]);
+        var rest = {}; Object.keys(p).forEach(function (k) { if (k !== c) rest[k] = p[k]; });
+        if (!t || !open(t, rest)) { dropped.push(p[c]); delete p[c]; changed = true; }
+      });
+    }
+    return dropped;
+  }
+  /* the starts a creator pick names (unlockedBy / excludedBy): the planner offers a story start only where one matters */
+  function startLocked() {
+    return A.data.traits.some(function (t) { return t.unlockedBy.concat(t.excludedBy).some(function (u) { return A.byName("starts", u); }); });
+  }
+  A.planner = {open: open, totals: totals, prune: prune, START: START, startLocked: startLocked};   // the gate runs these under node
 
   A.pages.planner = function () {
     var cats = A.data.categories, C = A.data.creation;
@@ -914,9 +936,10 @@
     var builds = stored.A || stored.B ? {A: stored.A || {}, B: stored.B || {}} : {A: stored, B: {}};   // an older save was one build
     var parse = function (str) {
       var out = {};
-      str.split("|").forEach(function (n) { var t = A.byName("traits", n); if (t) out[t.category] = n; });
+      str.split("|").forEach(function (n) { var t = A.byName("traits", n); if (t) out[t.category] = n; else if (A.byName("starts", n)) out[START] = n; });
       return out;
     };
+    var starts = startLocked() ? A.data.starts : [];
     if (A.param("pick")) builds = {A: parse(A.param("pick")), B: A.param("vs") ? parse(A.param("vs")) : {}};
     var slot = "A", mode = "edit", picked = builds.A;
     var rules = A.data.site.books.planner.map(A.bookLink);
@@ -925,18 +948,6 @@
       '<a href="planner/" data-slot="A">Build A</a><a href="planner/" data-slot="B">Build B</a><a href="planner/" data-slot="cmp">Compare A and B</a></nav>' +
       '<div class="article"><div id="pcats"></div>' +
       '<aside class="infobox" id="ptotal"></aside></div>');
-    function prune(p) {
-      var changed = true, dropped = [];
-      while (changed) {   // a pick whose unlocker went away is dropped, and that can drop others
-        changed = false;
-        Object.keys(p).forEach(function (c) {
-          var t = A.byName("traits", p[c]);
-          var rest = {}; Object.keys(p).forEach(function (k) { if (k !== c) rest[k] = p[k]; });
-          if (!t || !open(t, rest)) { dropped.push(p[c]); delete p[c]; changed = true; }
-        });
-      }
-      return dropped;
-    }
     function draw() {
       var dropped = prune(picked);
       builds[slot] = picked;
@@ -950,6 +961,10 @@
       document.getElementById("ptotal").hidden = mode === "compare";
       if (mode === "compare") { prune(builds.A); prune(builds.B); compare(); return; }
       document.getElementById("pcats").innerHTML = (dropped.length ? '<p class="warn">No longer open, so left out: ' + dropped.map(esc).join(", ") + "</p>" : "") +
+        (starts.length ? '<div class="say"><label for="pc-start"><b>Story start</b></label> <span class="note">some picks open or close with the start</span>' +
+          '<div class="line"><select id="pc-start" data-cat="' + START + '" style="flex:1"><option value="">(no start chosen)</option>' +
+          starts.map(function (s) { return "<option" + (picked[START] === s.name ? " selected" : "") + ">" + esc(s.name) + "</option>"; }).join("") +
+          "</select></div></div>" : "") +
         cats.map(function (c) {
           var rest = {}; Object.keys(picked).forEach(function (k) { if (k !== c.name) rest[k] = picked[k]; });
           var opts = c.traits.map(function (n) { return A.byName("traits", n); }).filter(function (t) { return t && open(t, rest); });
@@ -997,6 +1012,7 @@
       };
       var keys = function (x, y) { var k = {}; Object.keys(x).concat(Object.keys(y)).forEach(function (n) { k[n] = 1; }); return Object.keys(k).sort(); };
       var html = '<div class="tablewrap"><table class="cmp"><thead><tr><th></th><th>Build A</th><th>Build B</th></tr></thead><tbody>' +
+        (builds.A[START] || builds.B[START] ? row("Story start", builds.A[START] || "", builds.B[START] || "") : "") +
         cats.filter(function (c) { return builds.A[c.name] || builds.B[c.name]; }).map(function (c) {
           return row(c.name, builds.A[c.name] || "", builds.B[c.name] || "");
         }).join("") +
